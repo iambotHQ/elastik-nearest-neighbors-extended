@@ -152,15 +152,15 @@ public class AknnRestAction extends BaseRestHandler {
         StopWatch stopWatch = new StopWatch("StopWatch to query LSH cache");
         logger.info("Build boolean query from hashes");
         stopWatch.start("Build boolean query from hashes");
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery();
+        BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery();
         for (Map.Entry<String, Long> entry : queryHashes.entrySet()) {
             String termKey = HASHES_KEY + "." + entry.getKey();
-            ((BoolQueryBuilder) queryBuilder).should(QueryBuilders.termQuery(termKey, entry.getValue()));
+            queryBuilder.should(QueryBuilders.termQuery(termKey, entry.getValue()));
         }
-        ((BoolQueryBuilder) queryBuilder).minimumShouldMatch(minimum_should_match);
+        queryBuilder.minimumShouldMatch(minimum_should_match);
 
         if (filterString != null) {
-            ((BoolQueryBuilder) queryBuilder).filter(new WrapperQueryBuilder(filterString));
+            queryBuilder.filter(new WrapperQueryBuilder(filterString));
         }
         //logger.info(queryBuilder.toString());
         stopWatch.stop();
@@ -424,13 +424,11 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer nbTables = (Integer) sourceMap.get("_aknn_nb_tables");
         final Integer nbBitsPerTable = (Integer) sourceMap.get("_aknn_nb_bits_per_table");
         final Integer nbDimensions = (Integer) sourceMap.get("_aknn_nb_dimensions");
-        @SuppressWarnings("unchecked") final List<List<Double>> vectorSample = (List<List<Double>>) contentMap.get("_aknn_vector_sample");
         stopWatch.stop();
 
         logger.info("Fit LSH model from sample vectors");
         stopWatch.start("Fit LSH model from sample vectors");
         LshModel lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description);
-        lshModel.fitFromVectorSample(vectorSample);
         stopWatch.stop();
 
         logger.info("Serialize LSH model");
@@ -554,5 +552,4 @@ public class AknnRestAction extends BaseRestHandler {
             channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
         };
     }
-
 }
