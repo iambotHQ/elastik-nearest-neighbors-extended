@@ -1,3 +1,10 @@
+## Changes
+
+This fork builds on SthPhoenix's fork and aims to remove the need to manually provide vector sample for `_akn_create` endpoint, while removing some unnecessary complexities and generally heightening code quality.
+
+***
+_SthPhoenix's readme_
+
 ## Changes to original version:
 
 ### Added new REST endpoints:
@@ -60,7 +67,7 @@ This fork was originally compiled and tested for ES 6.5.1, but it should work fo
 4. Implement cosine metric (not just metric, but hashing algorithm, obviously).
 
 ***
-_Original readme_
+_Original readme (with modified `_aknn_create` example)_
 # ElastiK Nearest Neighbors
 
 [Insight Data Engineering](https://www.insightdataengineering.com/) Project, Boston, April - June 2018
@@ -150,7 +157,7 @@ below and the slides linked in the demo section.
 
 #### Create LSH Model
 
-Given a sample of vectors, create a locality-sensitive-hashing (LSH) model 
+Create a locality-sensitive-hashing (LSH) model 
 and store it as an Elasticsearch document.
 
 ```
@@ -165,14 +172,7 @@ POST <elasticsearch host>:9200/_aknn_create
         "_aknn_nb_tables": 64,
         "_aknn_nb_bits_per_table": 18,
         "_aknn_nb_dimensions": 1000
-    },
-    "_aknn_vector_sample": [
-        # Provide a sample of 2 * _aknn_nb_tables * _aknn_nb_bits_per_table vectors
-        [0.11, 0.22, ...],
-        [0.22, 0.33, ...],
-        ...
-        [0.88, 0.99, ...]
-    ]
+    }
 }
 ```
 
