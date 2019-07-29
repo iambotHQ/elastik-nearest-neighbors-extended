@@ -38,6 +38,22 @@ public class LshModel {
 
     private List<RealMatrix> bases;
 
+
+    public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description, List<List<Double>> bases) {
+        this.nbTables = nbTables;
+        this.nbBitsPerTable = nbBitsPerTable;
+        this.nbDimensions = nbDimensions;
+        this.description = description;
+
+        RealMatrix concatenatedTables = MatrixUtils.createRealMatrix(nestedListToNestedArraysDouble(bases));
+        // assert nbBitsPerTable == concatenatedTables.getRowDimension() / nbTables; // TODO better inputted bases dimension checking
+
+        this.bases = IntStream.range(0, nbTables)
+                .map(r -> r * nbBitsPerTable)
+                .mapToObj(r -> concatenatedTables.getSubMatrix(r, r + nbBitsPerTable - 1, 0, concatenatedTables.getColumnDimension()))
+                .collect(Collectors.toList());
+    }
+
     public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description) {
         this.nbTables = nbTables;
         this.nbBitsPerTable = nbBitsPerTable;
@@ -52,9 +68,8 @@ public class LshModel {
             .collect(Collectors.toMap(
                 Pair::getKey,
                 basePair -> {
-                    RealMatrix queryVectorAsMatrix = basePair.getValue().multiply(MatrixUtils.createColumnRealMatrix(
-                            ArrayUtils.toPrimitive(queryVector.toArray(new Double[queryVector.size()])))
-                    );
+                    RealMatrix queryVectorAsMatrix = MatrixUtils.createColumnRealMatrix(
+                            ArrayUtils.toPrimitive(queryVector.toArray(new Double[queryVector.size()])));
                     double[] dotProducts = basePair.getValue().multiply(queryVectorAsMatrix).getColumn(0);
                     long hash = IntStream.range(0, dotProducts.length).mapToLong(i ->
                             dotProducts[i] > 0 ? (long) Math.pow(2, i) : 0L).sum();
@@ -72,11 +87,7 @@ public class LshModel {
 
         List<List<List<Double>>> basesRaw = (List<List<List<Double>>>) serialized.get("_aknn_bases");
         lshModel.bases = basesRaw.stream()
-            .map(a ->
-                a.stream()
-                    .map(b -> ArrayUtils.toPrimitive(b.toArray(new Double[b.size()])))
-                    .toArray(double[][]::new)
-            )
+            .map(LshModel::nestedListToNestedArraysDouble)
             .map(MatrixUtils::createRealMatrix)
             .collect(Collectors.toList());
 
@@ -91,6 +102,12 @@ public class LshModel {
             put("_aknn_description", description);
             put("_aknn_bases", bases.stream().map(RealMatrix::getData).collect(Collectors.toList()));
         }};
+    }
+
+    private static double[][] nestedListToNestedArraysDouble(List<List<Double>> data) {
+        return data.stream()
+                .map(a -> ArrayUtils.toPrimitive(a.toArray(new Double[a.size()])))
+                .toArray(double[][]::new);
     }
 
     private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {

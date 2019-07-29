@@ -1,6 +1,6 @@
 ## Changes
 
-This fork builds on SthPhoenix's fork and aims to remove the need to manually provide vector sample for `_akn_create` endpoint, while removing some unnecessary complexities and generally heightening code quality.
+This fork builds on SthPhoenix's fork and aims to remove the need to manually provide vector sample for `_akn_create` endpoint, while removing some unnecessary complexities and generally hightening code quality.
 
 ***
 _SthPhoenix's readme_

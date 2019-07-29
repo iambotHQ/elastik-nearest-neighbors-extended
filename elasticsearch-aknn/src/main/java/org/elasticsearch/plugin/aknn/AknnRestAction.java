@@ -28,13 +28,10 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.DeprecationHandler;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.index.cache.IndexCache;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.WrapperQueryBuilder;
 import org.elasticsearch.rest.BaseRestHandler;
@@ -55,8 +52,6 @@ import static java.lang.Math.min;
 import static org.elasticsearch.rest.RestRequest.Method.GET;
 import static org.elasticsearch.rest.RestRequest.Method.POST;
 
-import javax.lang.model.type.NullType;
-
 public class AknnRestAction extends BaseRestHandler {
 
     public static String NAME = "_aknn";
@@ -64,6 +59,7 @@ public class AknnRestAction extends BaseRestHandler {
     private final String NAME_SEARCH_VEC = "_aknn_search_vec";
     private final String NAME_INDEX = "_aknn_index";
     private final String NAME_CREATE = "_aknn_create";
+    private final String NAME_CREATE_RANDOM = "_aknn_create_random";
     private final String NAME_CLEAR_CACHE = "_aknn_clear_cache";
 
     // TODO: check how parameters should be defined at the plugin level.
@@ -84,6 +80,7 @@ public class AknnRestAction extends BaseRestHandler {
         controller.registerHandler(POST, NAME_SEARCH_VEC, this);
         controller.registerHandler(POST, NAME_INDEX, this);
         controller.registerHandler(POST, NAME_CREATE, this);
+        controller.registerHandler(POST, NAME_CREATE_RANDOM, this);
         controller.registerHandler(GET, NAME_CLEAR_CACHE, this);
     }
 
@@ -102,8 +99,10 @@ public class AknnRestAction extends BaseRestHandler {
             return handleIndexRequest(restRequest, client);
         else if (restRequest.path().endsWith(NAME_CLEAR_CACHE))
             return handleClearRequest(restRequest, client);
+        else if (restRequest.path().endsWith(NAME_CREATE))
+            return handleCreateRequest(restRequest, client, false);
         else
-            return handleCreateRequest(restRequest, client);
+            return handleCreateRequest(restRequest, client, true);
     }
 
     public static Double euclideanDistance(List<Double> A, List<Double> B) {
@@ -401,7 +400,7 @@ public class AknnRestAction extends BaseRestHandler {
     }
 
 
-    private RestChannelConsumer handleCreateRequest(RestRequest restRequest, NodeClient client) throws IOException {
+    private RestChannelConsumer handleCreateRequest(RestRequest restRequest, NodeClient client, boolean randomBase) throws IOException {
 
         StopWatch stopWatch = new StopWatch("StopWatch to time create request");
         logger.info("Parse request");
@@ -426,9 +425,16 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer nbDimensions = (Integer) sourceMap.get("_aknn_nb_dimensions");
         stopWatch.stop();
 
-        logger.info("Fit LSH model from sample vectors");
-        stopWatch.start("Fit LSH model from sample vectors");
-        LshModel lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description);
+        logger.info("Fit LSH model with base vectors");
+        stopWatch.start("Fit LSH model with base vectors");
+        LshModel lshModel;
+        if (randomBase) {
+            lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description);
+        }
+        else {
+            @SuppressWarnings("unchecked") final List<List<Double>> vectorSample = (List<List<Double>>) contentMap.get("_aknn_vector_sample");
+            lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description, vectorSample);
+        }
         stopWatch.stop();
 
         logger.info("Serialize LSH model");
