@@ -19,6 +19,7 @@ package org.elasticsearch.plugin.aknn;
 
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.test.ESIntegTestCase;
@@ -40,10 +41,10 @@ public class AknnSimpleIT extends ESIntegTestCase {
 
     /**
      * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
-     * @throws IOException
+     * @throws IOException if performing request fails
      */
     public void testPluginInstallation() throws IOException {
-        Response response = restClient.performRequest("GET", "_cat/plugins");
+        Response response = restClient.performRequest(new Request("GET", "_cat/plugins"));
         String body = EntityUtils.toString(response.getEntity());
         logger.info(body);
         assertTrue(body.contains("elasticsearch-aknn"));
