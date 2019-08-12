@@ -50,7 +50,7 @@ public class LshModel {
 
         this.bases = IntStream.range(0, nbTables)
                 .map(r -> r * nbBitsPerTable)
-                .mapToObj(r -> concatenatedTables.getSubMatrix(r, r + nbBitsPerTable - 1, 0, concatenatedTables.getColumnDimension()))
+                .mapToObj(r -> concatenatedTables.getSubMatrix(r, r + nbBitsPerTable - 1, 0, concatenatedTables.getColumnDimension() - 1))
                 .collect(Collectors.toList());
     }
 

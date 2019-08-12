@@ -17,6 +17,8 @@
 
 package org.elasticsearch.plugin.aknn;
 
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Request;
@@ -25,7 +27,15 @@ import org.elasticsearch.client.RestClient;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.stream.Collectors;
 
 public class AknnSimpleIT extends ESIntegTestCase {
 
@@ -39,6 +49,23 @@ public class AknnSimpleIT extends ESIntegTestCase {
         restClient = getRestClient();
     }
 
+    public String getResourceFileAsString(String fileName) {
+        InputStream is = getClass().getClassLoader().getResourceAsStream(fileName);
+        if (is != null) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            return reader.lines().collect(Collectors.joining(System.lineSeparator()));
+        }
+        return null;
+    }
+
+    private Response performJSONRequest(String jsonPath, String endpoint) throws IOException {
+        Request postReq = new Request("POST", endpoint);
+        postReq.setEntity(new StringEntity(
+                getResourceFileAsString(jsonPath),
+                ContentType.APPLICATION_JSON));
+        return restClient.performRequest(postReq);
+    }
+
     /**
      * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
      * @throws IOException if performing request fails
@@ -48,6 +75,15 @@ public class AknnSimpleIT extends ESIntegTestCase {
         String body = EntityUtils.toString(response.getEntity());
         logger.info(body);
         assertTrue(body.contains("elasticsearch-aknn"));
+    }
+
+    public void testCreatingIndex() throws IOException {
+        performJSONRequest("createModel.json", "_aknn_create");
+        performJSONRequest("createIndex.json", "_aknn_index");
+        Response response = performJSONRequest("similaritySearch.json", "_aknn_search_vec");
+        String body = EntityUtils.toString(response.getEntity());
+        logger.info(body);
+        //assertTrue(body.contains("elasticsearch-aknn"));
     }
 
 }
