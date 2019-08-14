@@ -47,6 +47,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 
 import static java.lang.Math.min;
 import static org.elasticsearch.rest.RestRequest.Method.GET;
@@ -72,6 +73,7 @@ public class AknnRestAction extends BaseRestHandler {
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
     private Map<String, LshModel> lshModelCache = new HashMap<>();
+    private ExecutorService executorService = new ThreadPoolExecutor(12, 32, 200L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
 
     @Inject
     public AknnRestAction(Settings settings, RestController controller) {
@@ -91,18 +93,33 @@ public class AknnRestAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest restRequest, NodeClient client) throws IOException {
-        if (restRequest.path().endsWith(NAME_SEARCH_VEC))
-            return handleSearchVecRequest(restRequest, client);
-        else if (restRequest.path().endsWith(NAME_SEARCH))
-            return handleSearchRequest(restRequest, client);
-        else if (restRequest.path().endsWith(NAME_INDEX))
-            return handleIndexRequest(restRequest, client);
-        else if (restRequest.path().endsWith(NAME_CLEAR_CACHE))
-            return handleClearRequest(restRequest, client);
-        else if (restRequest.path().endsWith(NAME_CREATE))
-            return handleCreateRequest(restRequest, client, false);
-        else
-            return handleCreateRequest(restRequest, client, true);
+        // wrap whole task in another Thread
+        RunnableWithResult<RestChannelConsumer> task = new RunnableWithResult<>(() -> {
+            if (restRequest.path().endsWith(NAME_SEARCH_VEC))
+                return handleSearchVecRequest(restRequest, client);
+            else if (restRequest.path().endsWith(NAME_SEARCH))
+                return handleSearchRequest(restRequest, client);
+            else if (restRequest.path().endsWith(NAME_INDEX))
+                return handleIndexRequest(restRequest, client);
+            else if (restRequest.path().endsWith(NAME_CLEAR_CACHE))
+                return handleClearRequest(restRequest, client);
+            else if (restRequest.path().endsWith(NAME_CREATE))
+                return handleCreateRequest(restRequest, client, false);
+            else
+                return handleCreateRequest(restRequest, client, true);
+        });
+
+        executorService.submit(task);
+        try {
+            return task.getResult();
+        } catch(Exception e) {
+            if(e instanceof IOException) {
+                throw (IOException)e;
+            } else {
+                logger.error(e);
+                return null;
+            }
+        }
     }
 
     public static Double euclideanDistance(List<Double> A, List<Double> B) {
