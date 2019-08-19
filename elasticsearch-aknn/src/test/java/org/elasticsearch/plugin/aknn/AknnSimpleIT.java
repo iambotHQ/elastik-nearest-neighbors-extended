@@ -17,13 +17,19 @@
 
 package org.elasticsearch.plugin.aknn;
 
+import com.google.gson.Gson;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.common.xcontent.DeprecationHandler;
+import org.elasticsearch.common.xcontent.XContentHelper;
+import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.plugin.aknn.models.CreateIndexResponse;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
 
@@ -35,12 +41,15 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class AknnSimpleIT extends ESIntegTestCase {
 
     private Client client;
     private RestClient restClient;
+    private Gson gson = new Gson();
 
     @Before
     public void setUp() throws Exception {
@@ -58,13 +67,18 @@ public class AknnSimpleIT extends ESIntegTestCase {
         return null;
     }
 
-    private Response performJSONRequest(String jsonPath, String endpoint) throws IOException {
-        Request postReq = new Request("POST", endpoint);
+    private Response performJSONRequest(String jsonPath, String endpoint, String method) throws IOException {
+        Request postReq = new Request(method, endpoint);
         postReq.setEntity(new StringEntity(
                 getResourceFileAsString(jsonPath),
                 ContentType.APPLICATION_JSON));
         return restClient.performRequest(postReq);
     }
+
+    private Response performJSONRequest(String jsonPath, String endpoint) throws IOException {
+        return performJSONRequest(jsonPath, endpoint, "POST");
+    }
+
 
     /**
      * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
@@ -79,11 +93,26 @@ public class AknnSimpleIT extends ESIntegTestCase {
 
     public void testCreatingIndex() throws IOException {
         performJSONRequest("createModel.json", "_aknn_create");
-        /*performJSONRequest("createIndex.json", "_aknn_index");
+        // create index & mapping
+        restClient.performRequest(new Request("PUT", "twitter_images"));
+        performJSONRequest("indexMapping.json", "twitter_images/_doc/_mapping", "PUT");
+        // fill index with data
+        performJSONRequest("createIndex.json", "_aknn_index");
+        refresh("twitter_images", "aknn_models");
+
         Response response = performJSONRequest("similaritySearch.json", "_aknn_search_vec");
-        String body = EntityUtils.toString(response.getEntity());
-        logger.info(body);*/
+        CreateIndexResponse createIndexResponse = gson.fromJson(EntityUtils.toString(response.getEntity()), CreateIndexResponse.class);
+        assertNotNull(createIndexResponse.hits);
+        assertNotNull(createIndexResponse.hits.hits);
+        assertEquals(5, createIndexResponse.hits.hits.size());
+
+        //Response response = restClient.performRequest(new Request("GET", "twitter_images/_doc/1/_aknn_search?k1=1000&k2=10"));
         //assertTrue(body.contains("elasticsearch-aknn"));
+
+        /*Response response = restClient.performRequest(new Request("GET", "_cat/indices/?v"));
+        String body = EntityUtils.toString(response.getEntity());
+        logger.info("-----------");
+        logger.info(body);*/
     }
 
 }

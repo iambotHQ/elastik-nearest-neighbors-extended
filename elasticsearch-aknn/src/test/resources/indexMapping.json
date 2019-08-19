@@ -1,0 +1,8 @@
+{
+  "properties": {
+    "_aknn_vector": {
+      "type": "half_float",
+      "index": false
+    }
+  }
+}
