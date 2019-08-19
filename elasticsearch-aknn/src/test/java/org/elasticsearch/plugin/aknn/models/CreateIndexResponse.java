@@ -4,8 +4,8 @@ import java.util.List;
 
 public class CreateIndexResponse {
     public static class Hit {
-        String source, _id;
-        double _score;
+        public String source, _id;
+        public double _score;
 
         public Hit(String source, String _id, double _score) {
             this.source = source;

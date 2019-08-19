@@ -21,14 +21,10 @@ import com.google.gson.Gson;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.common.xcontent.DeprecationHandler;
-import org.elasticsearch.common.xcontent.XContentHelper;
-import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.plugin.aknn.models.CreateIndexResponse;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
@@ -37,12 +33,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class AknnSimpleIT extends ESIntegTestCase {
@@ -79,19 +69,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
         return performJSONRequest(jsonPath, endpoint, "POST");
     }
 
-
-    /**
-     * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
-     * @throws IOException if performing request fails
-     */
-    public void testPluginInstallation() throws IOException {
-        Response response = restClient.performRequest(new Request("GET", "_cat/plugins"));
-        String body = EntityUtils.toString(response.getEntity());
-        logger.info(body);
-        assertTrue(body.contains("elasticsearch-aknn"));
-    }
-
-    public void testCreatingIndex() throws IOException {
+    private void prepareData() throws IOException {
         performJSONRequest("createModel.json", "_aknn_create");
         // create index & mapping
         restClient.performRequest(new Request("PUT", "twitter_images"));
@@ -99,20 +77,59 @@ public class AknnSimpleIT extends ESIntegTestCase {
         // fill index with data
         performJSONRequest("createIndex.json", "_aknn_index");
         refresh("twitter_images", "aknn_models");
+    }
+
+
+    /**
+     * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
+     * @throws IOException if performing a request fails
+     */
+    public void testPluginInstallation() throws IOException {
+        Response response = restClient.performRequest(new Request("GET", "_cat/plugins"));
+        String body = EntityUtils.toString(response.getEntity());
+        assertTrue(body.contains("elasticsearch-aknn"));
+    }
+
+    /**
+     * Test that search results returned by _aknn_search_vec and _aknn_search don't differ
+     * @throws IOException if performing a request fails
+     */
+    public void testSearchResultsTheSame() throws IOException {
+        prepareData();
 
         Response response = performJSONRequest("similaritySearch.json", "_aknn_search_vec");
         CreateIndexResponse createIndexResponse = gson.fromJson(EntityUtils.toString(response.getEntity()), CreateIndexResponse.class);
         assertNotNull(createIndexResponse.hits);
         assertNotNull(createIndexResponse.hits.hits);
-        assertEquals(5, createIndexResponse.hits.hits.size());
+        assertEquals(4, createIndexResponse.hits.hits.size());
 
-        //Response response = restClient.performRequest(new Request("GET", "twitter_images/_doc/1/_aknn_search?k1=1000&k2=10"));
-        //assertTrue(body.contains("elasticsearch-aknn"));
+        response = restClient.performRequest(new Request("GET", "twitter_images/_doc/1/_aknn_search?k1=1000&k2=10"));
+        CreateIndexResponse createIndexResponseIndexed = gson.fromJson(EntityUtils.toString(response.getEntity()), CreateIndexResponse.class);
+        assertNotNull(createIndexResponseIndexed.hits);
+        assertNotNull(createIndexResponseIndexed.hits.hits);
+        assertEquals(4, createIndexResponseIndexed.hits.hits.size());
 
-        /*Response response = restClient.performRequest(new Request("GET", "_cat/indices/?v"));
-        String body = EntityUtils.toString(response.getEntity());
-        logger.info("-----------");
-        logger.info(body);*/
+        for(int i = 0; i < createIndexResponse.hits.hits.size(); i++) {
+            assertEquals(createIndexResponse.hits.hits.get(i)._score, createIndexResponseIndexed.hits.hits.get(i)._score, 0.001);
+        }
+    }
+
+    /**
+     * Test that search results returned by _aknn_search_vec are in correct order
+     * @throws IOException if performing a request fails
+     */
+    public void testSearchResultsOrder() throws IOException {
+        prepareData();
+
+        Response response = performJSONRequest("similaritySearch.json", "_aknn_search_vec");
+        CreateIndexResponse createIndexResponse = gson.fromJson(EntityUtils.toString(response.getEntity()), CreateIndexResponse.class);
+        assertNotNull(createIndexResponse.hits);
+        assertNotNull(createIndexResponse.hits.hits);
+        assertEquals(4, createIndexResponse.hits.hits.size());
+        assertEquals(createIndexResponse.hits.hits.get(0)._id, "1");
+        assertEquals(createIndexResponse.hits.hits.get(1)._id, "2");
+        assertEquals(createIndexResponse.hits.hits.get(2)._id, "3");
+        assertEquals(createIndexResponse.hits.hits.get(3)._id, "4");
     }
 
 }

@@ -12,25 +12,19 @@
     {
       "_id": "2",
       "_source": {
-        "_aknn_vector": [0.0, 1.0, 0.0]
+        "_aknn_vector": [1.0, 1.0, 0.0]
       }
     },
     {
       "_id": "3",
       "_source": {
-        "_aknn_vector": [1.0, 1.0, 0.0]
+        "_aknn_vector": [0.0, 1.0, 0.0]
       }
     },
     {
       "_id": "4",
       "_source": {
-        "_aknn_vector": [1.0, 1.0, 1.0]
-      }
-    },
-    {
-      "_id": "5",
-      "_source": {
-        "_aknn_vector": [1.0, 0.0, 0.0]
+        "_aknn_vector": [0.0, 1.0, 1.0]
       }
     }
   ]
