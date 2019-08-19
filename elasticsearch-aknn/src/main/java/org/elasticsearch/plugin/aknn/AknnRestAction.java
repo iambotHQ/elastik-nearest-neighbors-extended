@@ -113,11 +113,10 @@ public class AknnRestAction extends BaseRestHandler {
         try {
             return task.getResult();
         } catch(Exception e) {
-            if(e instanceof IOException) {
+            if (e instanceof IOException) {
                 throw (IOException)e;
             } else {
-                logger.error(e);
-                return null;
+                throw new RuntimeException(e);
             }
         }
     }
@@ -519,7 +518,7 @@ public class AknnRestAction extends BaseRestHandler {
             List<Double> vector = (List<Double>) source.get(VECTOR_KEY);
             source.put(HASHES_KEY, lshModel.getVectorHashes(vector));
             bulkIndexRequest.add(client
-                    .prepareIndex(index, type, (String) doc.get("_id"))
+                    .prepareIndex(index, type, String.valueOf(doc.get("_id")))
                     .setSource(source));
         }
         stopWatch.stop();

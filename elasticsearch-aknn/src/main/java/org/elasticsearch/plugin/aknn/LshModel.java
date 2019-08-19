@@ -69,7 +69,7 @@ public class LshModel {
                 Pair::getKey,
                 basePair -> {
                     RealMatrix queryVectorAsMatrix = MatrixUtils.createColumnRealMatrix(
-                            ArrayUtils.toPrimitive(queryVector.toArray(new Double[queryVector.size()])));
+                            queryVector.stream().mapToDouble(Double::doubleValue).toArray());
                     double[] dotProducts = basePair.getValue().multiply(queryVectorAsMatrix).getColumn(0);
                     long hash = IntStream.range(0, dotProducts.length).mapToLong(i ->
                             dotProducts[i] > 0 ? (long) Math.pow(2, i) : 0L).sum();
@@ -106,7 +106,7 @@ public class LshModel {
 
     private static double[][] nestedListToNestedArraysDouble(List<List<Double>> data) {
         return data.stream()
-                .map(a -> ArrayUtils.toPrimitive(a.toArray(new Double[a.size()])))
+                .map(a -> a.stream().mapToDouble(Double::doubleValue).toArray())
                 .toArray(double[][]::new);
     }
 
@@ -115,13 +115,14 @@ public class LshModel {
         GaussianRandomGenerator scalarGenerator = new GaussianRandomGenerator(rg);
         UncorrelatedRandomVectorGenerator vectorGenerator = new UncorrelatedRandomVectorGenerator(nbDimensions, scalarGenerator);
 
-        return IntStream.range(0, nbTables).mapToObj(__ ->
-            MatrixUtils.createRealMatrix(
-                (double[][]) IntStream
-                    .range(0, nbBitsPerTable)
-                    .mapToObj(i -> vectorGenerator.nextVector())
-                    .toArray()
-            )
-        ).collect(Collectors.toList());
+        ArrayList<RealMatrix> matrices = new ArrayList<>();
+        for(int i = 0; i < nbTables; i++) {
+            double[][] d = new double[nbBitsPerTable][];
+            for(int j = 0; j < nbBitsPerTable; j++) {
+                d[j] = vectorGenerator.nextVector();
+            }
+            matrices.add(MatrixUtils.createRealMatrix(d));
+        }
+        return matrices;
     }
 }
