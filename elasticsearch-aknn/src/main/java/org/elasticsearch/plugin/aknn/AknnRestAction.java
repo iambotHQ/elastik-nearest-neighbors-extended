@@ -113,11 +113,7 @@ public class AknnRestAction extends BaseRestHandler {
         try {
             return task.getResult();
         } catch(Exception e) {
-            if (e instanceof IOException) {
-                throw (IOException)e;
-            } else {
-                throw new RuntimeException(e);
-            }
+            throw new AKNNException(e);
         }
     }
 
