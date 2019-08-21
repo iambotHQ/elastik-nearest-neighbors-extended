@@ -26,6 +26,7 @@ import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.plugin.aknn.models.CreateIndexResponse;
+import org.elasticsearch.plugin.aknn.models.GetVectorResponse;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
 
@@ -132,4 +133,34 @@ public class AknnSimpleIT extends ESIntegTestCase {
         assertEquals(createIndexResponse.hits.hits.get(3)._id, "4");
     }
 
+    /**
+     * Test that indexing a document with the same ID results in update
+     * @throws IOException if performing a request fails
+     */
+    public void testVectorUpdate() throws IOException {
+        prepareData();
+
+        Response response = restClient.performRequest(new Request("GET", "twitter_images/_doc/1"));
+        GetVectorResponse getVectorResponse = gson.fromJson(EntityUtils.toString(response.getEntity()), GetVectorResponse.class);
+        assertEquals(getVectorResponse._id, "1");
+        assertNotNull(getVectorResponse._source);
+        assertNotNull(getVectorResponse._source._aknn_vector);
+        assertEquals(getVectorResponse._source._aknn_vector.length, 3);
+        assertEquals(getVectorResponse._source._aknn_vector[0], 1.0, 0.001);
+        assertEquals(getVectorResponse._source._aknn_vector[1], 0.0, 0.0);
+        assertEquals(getVectorResponse._source._aknn_vector[2], 0.0, 0.0);
+
+        performJSONRequest("updateIndex.json", "_aknn_index");
+        refresh("twitter_images");
+
+        response = restClient.performRequest(new Request("GET", "twitter_images/_doc/1"));
+        getVectorResponse = gson.fromJson(EntityUtils.toString(response.getEntity()), GetVectorResponse.class);
+        assertEquals(getVectorResponse._id, "1");
+        assertNotNull(getVectorResponse._source);
+        assertNotNull(getVectorResponse._source._aknn_vector);
+        assertEquals(getVectorResponse._source._aknn_vector.length, 3);
+        assertEquals(getVectorResponse._source._aknn_vector[0], 0.0, 0.0);
+        assertEquals(getVectorResponse._source._aknn_vector[1], 0.0, 0.0);
+        assertEquals(getVectorResponse._source._aknn_vector[2], 0.0, 0.0);
+    }
 }
