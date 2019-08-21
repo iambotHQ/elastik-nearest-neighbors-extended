@@ -133,14 +133,14 @@ public class AknnRestAction extends BaseRestHandler {
         if (!lshModelCache.containsKey(aknnURI)) {
 
             // Get the Aknn document.
-            logger.info("Get Aknn model document from {}", aknnURI);
+            logger.debug("Get Aknn model document from {}", aknnURI);
             stopWatch.start("Get Aknn model document");
             String[] annURITokens = aknnURI.split("/");
             GetResponse aknnGetResponse = client.prepareGet(annURITokens[0], annURITokens[1], annURITokens[2]).get();
             stopWatch.stop();
 
             // Instantiate LSH from the source map.
-            logger.info("Parse Aknn model document");
+            logger.debug("Parse Aknn model document");
             stopWatch.start("Parse Aknn model document");
             lshModel = LshModel.fromMap(aknnGetResponse.getSourceAsMap());
             stopWatch.stop();
@@ -149,7 +149,7 @@ public class AknnRestAction extends BaseRestHandler {
             lshModelCache.put(aknnURI, lshModel);
 
         } else {
-            logger.info("Get Aknn model document from local cache");
+            logger.debug("Get Aknn model document from local cache");
             stopWatch.start("Get Aknn model document from local cache");
             lshModel = lshModelCache.get(aknnURI);
             stopWatch.stop();
@@ -161,7 +161,7 @@ public class AknnRestAction extends BaseRestHandler {
     private List<Map<String, Object>> QueryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, Boolean rescore, String filterString, Integer minimum_should_match, Boolean debug, NodeClient client) {
         // Retrieve the documents with most matching hashes. https://stackoverflow.com/questions/10773581
         StopWatch stopWatch = new StopWatch("StopWatch to query LSH cache");
-        logger.info("Build boolean query from hashes");
+        logger.debug("Build boolean query from hashes");
         stopWatch.start("Build boolean query from hashes");
         BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery();
         for (Map.Entry<String, Long> entry : queryHashes.entrySet()) {
@@ -173,7 +173,7 @@ public class AknnRestAction extends BaseRestHandler {
         if (filterString != null) {
             queryBuilder.filter(new WrapperQueryBuilder(filterString));
         }
-        //logger.info(queryBuilder.toString());
+        //logger.debug(queryBuilder.toString());
         stopWatch.stop();
 
         String hashes;
@@ -185,7 +185,7 @@ public class AknnRestAction extends BaseRestHandler {
         }
 
 
-        logger.info("Execute boolean search");
+        logger.debug("Execute boolean search");
         stopWatch.start("Execute boolean search");
         SearchResponse approximateSearchResponse = client
                 .prepareSearch(index)
@@ -198,7 +198,7 @@ public class AknnRestAction extends BaseRestHandler {
 
         // Compute exact KNN on the approximate neighbors.
         // Recreate the SearchHit structure, but remove the vector and hashes.
-        logger.info("Compute exact distance and construct search hits");
+        logger.debug("Compute exact distance and construct search hits");
         stopWatch.start("Compute exact distance and construct search hits");
         List<Map<String, Object>> modifiedSortedHits = new ArrayList<>();
         for (SearchHit hit : approximateSearchResponse.getHits()) {
@@ -232,14 +232,14 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         if (rescore == true) {
-            logger.info("Sort search hits by exact distance");
+            logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
             modifiedSortedHits.sort(Comparator.comparingDouble(x -> (Double) x.get("_score")));
             stopWatch.stop();
         } else {
-            logger.info("Exact distance rescoring passed");
+            logger.debug("Exact distance rescoring passed");
         }
-        logger.info("Timing summary for querying\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary for querying\n {}", stopWatch.prettyPrint());
         return modifiedSortedHits;
     }
 
@@ -277,13 +277,13 @@ public class AknnRestAction extends BaseRestHandler {
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
         stopWatch.stop();
 
-        logger.info("Get query document at {}/{}/{}", index, type, id);
+        logger.debug("Get query document at {}/{}/{}", index, type, id);
         stopWatch.start("Get query document");
         GetResponse queryGetResponse = client.prepareGet(index, type, id).get();
         Map<String, Object> baseSource = queryGetResponse.getSource();
         stopWatch.stop();
 
-        logger.info("Parse query document hashes");
+        logger.debug("Parse query document hashes");
         stopWatch.start("Parse query document hashes");
         @SuppressWarnings("unchecked")
         Map<String, Long> queryHashes = (Map<String, Long>) baseSource.get(HASHES_KEY);
@@ -299,7 +299,7 @@ public class AknnRestAction extends BaseRestHandler {
 
         stopWatch.stop();
 
-        logger.info("Timing summary\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
 
         return channel -> {
             XContentBuilder builder = channel.newBuilder();
@@ -387,12 +387,12 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.start("Query nearest neighbors");
         @SuppressWarnings("unchecked")
         Map<String, Long> queryHashes = lshModel.getVectorHashes(queryVector);
-        //logger.info("HASHES: {}", queryHashes);
+        //logger.debug("HASHES: {}", queryHashes);
 
 
         List<Map<String, Object>> modifiedSortedHits = QueryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimum_should_match, debug, client);
         stopWatch.stop();
-        logger.info("Timing summary\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
         return channel -> {
             XContentBuilder builder = channel.newBuilder();
             builder.startObject();
@@ -415,7 +415,7 @@ public class AknnRestAction extends BaseRestHandler {
     private RestChannelConsumer handleCreateRequest(RestRequest restRequest, NodeClient client, boolean randomBase) throws IOException {
 
         StopWatch stopWatch = new StopWatch("StopWatch to time create request");
-        logger.info("Parse request");
+        logger.debug("Parse request");
         stopWatch.start("Parse request");
 
         XContentParser xContentParser = XContentHelper.createParser(
@@ -437,7 +437,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer nbDimensions = (Integer) sourceMap.get("_aknn_nb_dimensions");
         stopWatch.stop();
 
-        logger.info("Fit LSH model with base vectors");
+        logger.debug("Fit LSH model with base vectors");
         stopWatch.start("Fit LSH model with base vectors");
         LshModel lshModel;
         if (randomBase) {
@@ -449,19 +449,19 @@ public class AknnRestAction extends BaseRestHandler {
         }
         stopWatch.stop();
 
-        logger.info("Serialize LSH model");
+        logger.debug("Serialize LSH model");
         stopWatch.start("Serialize LSH model");
         Map<String, Object> lshSerialized = lshModel.toMap();
         stopWatch.stop();
 
-        logger.info("Index LSH model");
+        logger.debug("Index LSH model");
         stopWatch.start("Index LSH model");
         IndexResponse indexResponse = client.prepareIndex(_index, _type, _id)
                 .setSource(lshSerialized)
                 .get();
         stopWatch.stop();
 
-        logger.info("Timing summary\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
 
         return channel -> {
             XContentBuilder builder = channel.newBuilder();
@@ -476,7 +476,7 @@ public class AknnRestAction extends BaseRestHandler {
 
         StopWatch stopWatch = new StopWatch("StopWatch to time bulk indexing request");
 
-        logger.info("Parse request parameters");
+        logger.debug("Parse request parameters");
         stopWatch.start("Parse request parameters");
         XContentParser xContentParser = XContentHelper.createParser(
                 restRequest.getXContentRegistry(),
@@ -489,7 +489,7 @@ public class AknnRestAction extends BaseRestHandler {
         final String aknnURI = (String) contentMap.get("_aknn_uri");
         final Boolean clear_cache = restRequest.paramAsBoolean("clear_cache", false);
         @SuppressWarnings("unchecked") final List<Map<String, Object>> docs = (List<Map<String, Object>>) contentMap.get("_aknn_docs");
-        logger.info("Received {} docs for indexing", docs.size());
+        logger.debug("Received {} docs for indexing", docs.size());
         stopWatch.stop();
 
         // TODO: check if the index exists. If not, create a mapping which does not index continuous values.
@@ -504,7 +504,7 @@ public class AknnRestAction extends BaseRestHandler {
         LshModel lshModel = InitLsh(aknnURI, client);
 
         // Prepare documents for batch indexing.
-        logger.info("Hash documents for indexing");
+        logger.debug("Hash documents for indexing");
         stopWatch.start("Hash documents for indexing");
         BulkRequestBuilder bulkIndexRequest = client.prepareBulk();
         for (Map<String, Object> doc : docs) {
@@ -519,12 +519,12 @@ public class AknnRestAction extends BaseRestHandler {
         }
         stopWatch.stop();
 
-        logger.info("Execute bulk indexing");
+        logger.debug("Execute bulk indexing");
         stopWatch.start("Execute bulk indexing");
         BulkResponse bulkIndexResponse = bulkIndexRequest.get();
         stopWatch.stop();
 
-        logger.info("Timing summary\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
 
         if (bulkIndexResponse.hasFailures()) {
             logger.error("Indexing failed with message: {}", bulkIndexResponse.buildFailureMessage());
@@ -538,7 +538,7 @@ public class AknnRestAction extends BaseRestHandler {
             };
         }
 
-        logger.info("Indexed {} docs successfully", docs.size());
+        logger.debug("Indexed {} docs successfully", docs.size());
         return channel -> {
             XContentBuilder builder = channel.newBuilder();
             builder.startObject();
@@ -554,11 +554,11 @@ public class AknnRestAction extends BaseRestHandler {
         //TODO: figure out how to execute clear cache on all nodes at once;
 
         StopWatch stopWatch = new StopWatch("StopWatch to time clear cache");
-        logger.info("Clearing LSH models cache");
+        logger.debug("Clearing LSH models cache");
         stopWatch.start("Clearing cache");
         lshModelCache.clear();
         stopWatch.stop();
-        logger.info("Timing summary\n {}", stopWatch.prettyPrint());
+        logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
 
 
         return channel -> {
