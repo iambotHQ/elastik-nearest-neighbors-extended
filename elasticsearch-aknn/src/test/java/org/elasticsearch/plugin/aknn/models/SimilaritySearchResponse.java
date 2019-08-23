@@ -2,7 +2,7 @@ package org.elasticsearch.plugin.aknn.models;
 
 import java.util.List;
 
-public class CreateIndexResponse {
+public class SimilaritySearchResponse {
     public static class Hit {
         public String source, _id;
         public double _score;
@@ -28,7 +28,7 @@ public class CreateIndexResponse {
 
     public HitInfo hits;
 
-    public CreateIndexResponse(HitInfo hits) {
+    public SimilaritySearchResponse(HitInfo hits) {
         this.hits = hits;
     }
 }
