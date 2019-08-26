@@ -41,6 +41,7 @@ import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -75,7 +76,7 @@ public class AknnRestAction extends BaseRestHandler {
     private final String VECTOR_KEY = "_aknn_vector";
     private final Integer K1_DEFAULT = 99;
     private final Integer K2_DEFAULT = 10;
-    private final String RESCORE_DEFAULT = RESCORE_NONE;
+    private final String RESCORE_DEFAULT = RESCORE_COSINE;
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
