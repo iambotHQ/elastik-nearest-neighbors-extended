@@ -68,13 +68,14 @@ public class AknnRestAction extends BaseRestHandler {
 
     private final String RESCORE_EUCLIDEAN = "EUCLIDEAN";
     private final String RESCORE_COSINE = "COSINE";
+    private final String RESCORE_NONE = "NONE";
 
     // TODO: check how parameters should be defined at the plugin level.
     private final String HASHES_KEY = "_aknn_hashes";
     private final String VECTOR_KEY = "_aknn_vector";
     private final Integer K1_DEFAULT = 99;
     private final Integer K2_DEFAULT = 10;
-    private final String RESCORE_DEFAULT = RESCORE_COSINE;
+    private final String RESCORE_DEFAULT = RESCORE_NONE;
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
@@ -259,7 +260,7 @@ public class AknnRestAction extends BaseRestHandler {
         }
         stopWatch.stop();
 
-        if (rescore != null) {
+        if (rescore != RESCORE_NONE) {
             logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
             modifiedSortedHits.sort(Comparator.comparingDouble(x -> (Double) x.get("_score")));
