@@ -53,7 +53,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
     }
 
     private void refreshAll() {
-        refresh(RequestFactory.index, RequestFactory.modelIndex);
+        flushAndRefresh(RequestFactory.index, RequestFactory.modelIndex);
     }
 
     /**
@@ -127,19 +127,21 @@ public class AknnSimpleIT extends ESIntegTestCase {
      */
     public void testLSHBig() throws IOException {
         aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
+        final int batchSize = 1000;
+        final int numBatches = 10;
 
         Random rand = new Random(55626L);
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
-        for(int j = 0; j < 5; j++) {
+        for(int j = 0; j < numBatches; j++) {
             List<CreateIndexRequest.Doc> docs = new ArrayList<>();
-            for (int i = 0; i < 10000; i++) {
+            for (int i = 0; i < batchSize; i++) {
                 double alpha = rand.nextDouble() * Math.PI * 2;
                 double beta = rand.nextDouble() * Math.PI * 2;
                 double x = Math.cos(alpha) * Math.cos(beta);
                 double z = Math.sin(alpha) * Math.cos(beta);
                 double y = Math.sin(beta);
                 CreateIndexRequest.Source source = new CreateIndexRequest.Source(new double[]{x, y, z});
-                docs.add(new CreateIndexRequest.Doc(String.valueOf(j * i + i), source));
+                docs.add(new CreateIndexRequest.Doc(String.valueOf(j * batchSize + i), source));
             }
             aknnAPI.createIndex(RequestFactory.createIndexRequest(docs));
             documents.addAll(docs);
@@ -175,13 +177,12 @@ public class AknnSimpleIT extends ESIntegTestCase {
         for(int i = 0; i < takeN; i++) {
             if (greedyIds.contains(lshIds.get(i))) {
                 numContains++;
-                System.out.println(idDistances.get(i).getSecond() + " | " + similaritySearchResponse.hits.hits.get(i)._score);
             }
         }
 
-        /*System.out.println("Greedy: " + greedyIds.toString());
+        System.out.println("Greedy: " + greedyIds.toString());
         System.out.println("LSH: " + lshIds.toString());
-        System.out.println("Num intersect: " + numContains);*/
+        System.out.println("Num intersect: " + numContains);
         assertTrue(numContains >= 6);
     }
 }
