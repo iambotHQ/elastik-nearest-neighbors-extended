@@ -67,12 +67,15 @@ public class AknnRestAction extends BaseRestHandler {
     private final String NAME_CREATE_RANDOM = "_aknn_create_random";
     private final String NAME_CLEAR_CACHE = "_aknn_clear_cache";
 
+    private final String RESCORE_EUCLIDEAN = "EUCLIDEAN";
+    private final String RESCORE_COSINE = "COSINE";
+
     // TODO: check how parameters should be defined at the plugin level.
     private final String HASHES_KEY = "_aknn_hashes";
     private final String VECTOR_KEY = "_aknn_vector";
     private final Integer K1_DEFAULT = 99;
     private final Integer K2_DEFAULT = 10;
-    private final Boolean RESCORE_DEFAULT = true;
+    private final String RESCORE_DEFAULT = RESCORE_COSINE;
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
@@ -140,6 +143,18 @@ public class AknnRestAction extends BaseRestHandler {
         return Math.sqrt(squaredDistance);
     }
 
+    public static Double cosineDistance(List<Double> A, List<Double> B) {
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0, s = A.size(); i < s; i++) {
+            double a = A.get(i), b = B.get(i);
+            dotProduct += a * b;
+            normA += Math.pow(a, 2.0);
+            normB += Math.pow(b, 2.0);
+        }
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
 
 	// Loading LSH model refactored as function
     //TODO Fix issues with stopwatch 
@@ -174,7 +189,7 @@ public class AknnRestAction extends BaseRestHandler {
     }
 
 	//  Query execution refactored as function and added wrapper query
-    private List<Map<String, Object>> QueryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, Boolean rescore, String filterString, Integer minimum_should_match, Boolean debug, NodeClient client) {
+    private List<Map<String, Object>> QueryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, String rescore, String filterString, Integer minimum_should_match, Boolean debug, NodeClient client) {
         // Retrieve the documents with most matching hashes. https://stackoverflow.com/questions/10773581
         StopWatch stopWatch = new StopWatch("StopWatch to query LSH cache");
         logger.debug("Build boolean query from hashes");
@@ -193,7 +208,7 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         String hashes;
-        if (debug==false) {
+        if (!debug) {
            hashes = HASHES_KEY;
         }
         else {
@@ -221,33 +236,31 @@ public class AknnRestAction extends BaseRestHandler {
             Map<String, Object> hitSource = hit.getSourceAsMap();
             @SuppressWarnings("unchecked")
             List<Double> hitVector = (List<Double>) hitSource.get(VECTOR_KEY);
-            if (debug == false) {
+            if (!debug) {
                 hitSource.remove(VECTOR_KEY);
                 hitSource.remove(HASHES_KEY);
             }
-            if (rescore) {
-                modifiedSortedHits.add(new HashMap<String, Object>() {{
-                    put("_index", hit.getIndex());
-                    put("_id", hit.getId());
-                    put("_type", hit.getType());
-                    put("_score", euclideanDistance(queryVector, hitVector));
-                    put("_source", hitSource);
-                }});
+
+            Double computedScore;
+            if(rescore == RESCORE_COSINE) {
+                computedScore = cosineDistance(queryVector, hitVector);
+            } else if(rescore == RESCORE_EUCLIDEAN) {
+                computedScore = euclideanDistance(queryVector, hitVector);
             } else {
-
-                modifiedSortedHits.add(new HashMap<String, Object>() {{
-                    put("_index", hit.getIndex());
-                    put("_id", hit.getId());
-                    put("_type", hit.getType());
-                    put("_score", hit.getScore());
-                    put("_source", hitSource);
-                }});
-
+                computedScore = (double) hit.getScore();
             }
+
+            modifiedSortedHits.add(new HashMap<String, Object>() {{
+                put("_index", hit.getIndex());
+                put("_id", hit.getId());
+                put("_type", hit.getType());
+                put("_score", computedScore);
+                put("_source", hitSource);
+            }});
         }
         stopWatch.stop();
 
-        if (rescore == true) {
+        if (rescore != null) {
             logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
             modifiedSortedHits.sort(Comparator.comparingDouble(x -> (Double) x.get("_score")));
@@ -289,7 +302,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer k1 = restRequest.paramAsInt("k1", K1_DEFAULT);
         final Integer k2 = restRequest.paramAsInt("k2", K2_DEFAULT);
         final Integer minimum_should_match = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
-        final Boolean rescore = restRequest.paramAsBoolean("rescore", RESCORE_DEFAULT);
+        final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
         stopWatch.stop();
 
@@ -385,7 +398,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer k1 = (Integer) aknnQueryMap.get("k1");
         final Integer k2 = (Integer) aknnQueryMap.get("k2");
         final Integer minimum_should_match = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
-        final Boolean rescore = restRequest.paramAsBoolean("rescore", RESCORE_DEFAULT);
+        final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean clear_cache = restRequest.paramAsBoolean("clear_cache", false);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
 
@@ -472,7 +485,7 @@ public class AknnRestAction extends BaseRestHandler {
 
         logger.debug("Index LSH model");
         stopWatch.start("Index LSH model");
-        IndexResponse indexResponse = client.prepareIndex(_index, _type, _id)
+        client.prepareIndex(_index, _type, _id)
                 .setSource(lshSerialized)
                 .get();
         stopWatch.stop();
