@@ -49,8 +49,6 @@ public class AknnAPI {
     }
 
     public void createIndex(CreateIndexRequest request) throws IOException {
-        restClient.performRequest(new Request("PUT", request._index));
-        performJSONRequest(getResourceFileAsString("indexMapping.json"), request._index + "/" + request._type + "/_mapping", "PUT");
         performJSONRequest(gson.toJson(request), "_aknn_index");
     }
 
