@@ -9,11 +9,11 @@ _SthPhoenix's readme_
 
 ### Added new REST endpoints:
 
-1. **`_aknn_search_vec`** - hybrid of original `_aknn_search` and `_aknn_index` endpoints: it accepts JSON with query vector, builds hashes for `_aknn_vector` and using them for building ES query and returning hits just like original `_aknn_search` endpoint.
+1. **`_aknn_search_vec`** - A modified version of `_aknn_search` where instead of providing an indexed ID you provide a vector
 
      Usage example:
      ```
-     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=true&debug=false&minimum_should_match=3&clear_cache=false
+     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=EUCLIDEAN&debug=false&minimum_should_match=1&clear_cache=false
      {
          "_index":       "twitter_images",
          "_type":        "_doc",
@@ -32,15 +32,13 @@ _SthPhoenix's readme_
           }
      }
      ```
-     
-     `filter` in example above is used for filtering data before executing similarity search. 
 
+2. **`_aknn_clear_cache`** - Clear LSH model cache on target node, useful if you are using index name or other readable names as model's `_id`
 
-
-2. **`_aknn_clear_cache`** - clear LSH model cache on target node, usefull if you are using index name or other readable names as models `_id`
+3. **`_aknn_create_random`** - Creates a model providing random vector samples
 
 ### Added new request arguments:
-1. **rescore (_boolean_)** - switches on/off final L2 metric based scoring. In some cases improves search speed at 10x, while maintaining acceptable recall. (some tweaks to index mapping are required to preserve high recall)
+1. **rescore (_boolean_)** - One of `COSINE` *(default)*, `EUCLIDEAN` or `NONE`. Upon finding similar items by number of matching hashes, you may wish to calculate their cosine/euclidean similarity score and sort the results accordingly (ascending, from most similar to least).
 2. **debug (_boolean_)** - keep original vectors and hashes if set to true, usefull for tinkering with metrics and scoring, also might be usefull for clustering query results.
 3. **minimum_should_match (_integer_)** - changing corresponding ES bool query argument, might improve search speed by lowering number of hits ES should score.
 4. **filter (_string_)** - ES [bool query](https://www.elastic.co/guide/en/elasticsearch/reference/6.5/query-filter-context.html) filter as string. Is a string you would normaly put inside a filter clause, i.e if your filter looks like this: 
@@ -161,7 +159,7 @@ Create a locality-sensitive-hashing (LSH) model
 and store it as an Elasticsearch document.
 
 ```
-POST <elasticsearch host>:9200/_aknn_create 
+POST <elasticsearch host>:9200/_aknn_create_random 
 
 {
     "_index":   "aknn_models",
