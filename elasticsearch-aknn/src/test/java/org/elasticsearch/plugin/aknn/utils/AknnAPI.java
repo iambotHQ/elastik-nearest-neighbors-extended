@@ -59,11 +59,6 @@ public class AknnAPI {
         return gson.fromJson(EntityUtils.toString(response.getEntity()), SimilaritySearchResponse.class);
     }
 
-    public SimilaritySearchResponse similaritySearch(int k1, int k2, String _index, String _type, String docId) throws IOException {
-        Response response = restClient.performRequest(new Request("GET", _index + "/" + _type + "/" + docId + "/_aknn_search?k1=" + k1 + "&k2=" + k2));
-        return gson.fromJson(EntityUtils.toString(response.getEntity()), SimilaritySearchResponse.class);
-    }
-
     public GetVectorResponse getVector(String _index, String _type, String docId) throws IOException {
         Response response = restClient.performRequest(new Request("GET", _index + "/" + _type + "/" + docId));
         return gson.fromJson(EntityUtils.toString(response.getEntity()), GetVectorResponse.class);

@@ -21,7 +21,6 @@ import com.typesafe.config.ConfigFactory;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.StopWatch;
@@ -143,7 +142,7 @@ public class AknnRestAction extends BaseRestHandler {
         return Math.sqrt(squaredDistance);
     }
 
-    public static Double cosineDistance(List<Double> A, List<Double> B) {
+    public static Double cosineSimilarity(List<Double> A, List<Double> B) {
         double dotProduct = 0.0;
         double normA = 0.0;
         double normB = 0.0;
@@ -153,7 +152,7 @@ public class AknnRestAction extends BaseRestHandler {
             normA += Math.pow(a, 2.0);
             normB += Math.pow(b, 2.0);
         }
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        return 1.0 - Math.abs(dotProduct) / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
 	// Loading LSH model refactored as function
@@ -243,7 +242,7 @@ public class AknnRestAction extends BaseRestHandler {
 
             Double computedScore;
             if(rescore == RESCORE_COSINE) {
-                computedScore = cosineDistance(queryVector, hitVector);
+                computedScore = cosineSimilarity(queryVector, hitVector);
             } else if(rescore == RESCORE_EUCLIDEAN) {
                 computedScore = euclideanDistance(queryVector, hitVector);
             } else {

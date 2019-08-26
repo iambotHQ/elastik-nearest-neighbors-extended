@@ -7,15 +7,21 @@ import org.elasticsearch.plugin.aknn.models.SimilaritySearchRequest;
 import java.util.List;
 
 public class RequestFactory {
-    public static CreateModelRequest createModelRequest() {
+    public static String index = "twitter_images";
+    public static String indexType = "_doc";
+    public static String modelIndex = "aknn_models";
+    public static String modelType = "aknn_model";
+    public static String modelId = "twitter_image_search";
+
+    public static CreateModelRequest createModelRequest(int nbTables, int nbBits) {
         return new CreateModelRequest(
-            "aknn_models",
-            "aknn_model",
-            "twitter_image_search",
+                modelIndex,
+                modelType,
+                modelId,
             new CreateModelRequest.Source(
                     "LSH model for Twitter image similarity search",
-                    64,
-                    18,
+                    nbTables,
+                    nbBits,
                     3
             )
         );
@@ -23,18 +29,18 @@ public class RequestFactory {
 
     public static CreateIndexRequest createIndexRequest(List<CreateIndexRequest.Doc> docs) {
         return new CreateIndexRequest(
-                "twitter_images",
-                "_doc",
-                "aknn_models/aknn_model/twitter_image_search",
+                index,
+                indexType,
+                modelIndex + "/" + modelType + "/" + modelId,
                 docs
         );
     }
 
     public static SimilaritySearchRequest similaritySearchRequest(SimilaritySearchRequest.Query query) {
         return new SimilaritySearchRequest(
-                "twitter_images",
-                "_doc",
-                "aknn_models/aknn_model/twitter_image_search",
+                index,
+                indexType,
+                modelIndex + "/" + modelType + "/" + modelId,
                 query
         );
     }

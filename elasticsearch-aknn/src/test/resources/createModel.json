@@ -4,8 +4,8 @@
   "_id":      "twitter_image_search",
   "_source": {
     "_aknn_description": "LSH model for Twitter image similarity search",
-    "_aknn_nb_tables": 64,
-    "_aknn_nb_bits_per_table": 18,
+    "_aknn_nb_tables": 200,
+    "_aknn_nb_bits_per_table": 12,
     "_aknn_nb_dimensions": 3
   },
   "_aknn_vector_sample": [
