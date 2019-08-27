@@ -17,10 +17,7 @@
 
 package org.elasticsearch.plugin.aknn;
 
-import org.apache.commons.math3.random.GaussianRandomGenerator;
-import org.apache.commons.math3.random.RandomDataGenerator;
-import org.apache.commons.math3.random.RandomGenerator;
-import org.apache.commons.math3.random.UncorrelatedRandomVectorGenerator;
+import org.apache.commons.math3.random.*;
 import org.apache.commons.math3.util.Pair;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Request;
@@ -38,6 +35,7 @@ import org.junit.Before;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class AknnSimpleIT extends ESIntegTestCase {
 
@@ -123,25 +121,28 @@ public class AknnSimpleIT extends ESIntegTestCase {
     }
 
     /**
-     * Test that similarity search returns good results on big data
+     * Test that similarity search returns similar results
      * @throws IOException if performing a request fails
      */
-    public void testLSHBig() throws IOException {
+    public void testLSHSimilar() throws IOException {
         final int batchSize = 1000;
         final int numBatches = 10;
         final int nbDimensions = 50;
         final int takeN = 10;
         final int k1 = 500;
-        aknnAPI.createModel(RequestFactory.createModelRequest(200, 12, nbDimensions));
+        aknnAPI.createModel(RequestFactory.createModelRequest(100, 8, nbDimensions));
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
         RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
         rg.setSeed(55626L);
-        GaussianRandomGenerator scalarGenerator = new GaussianRandomGenerator(rg);
-        UncorrelatedRandomVectorGenerator vectorGenerator = new UncorrelatedRandomVectorGenerator(nbDimensions, scalarGenerator);
         for(int j = 0; j < numBatches; j++) {
             List<CreateIndexRequest.Doc> docs = new ArrayList<>();
             for (int i = 0; i < batchSize; i++) {
-                CreateIndexRequest.Source source = new CreateIndexRequest.Source(vectorGenerator.nextVector());
+                double[] vector = IntStream.generate(() -> 1).mapToDouble(v -> v).limit(nbDimensions).toArray();
+                vector[0] = 0.00001 * (j * batchSize + i);
+                if (j * batchSize + i > takeN) {
+                    vector = Arrays.stream(vector).map(v -> -v).toArray();
+                }
+                CreateIndexRequest.Source source = new CreateIndexRequest.Source(vector);
                 docs.add(new CreateIndexRequest.Doc(String.valueOf(j * batchSize + i), source));
             }
             aknnAPI.createIndex(RequestFactory.createIndexRequest(docs));
@@ -149,7 +150,8 @@ public class AknnSimpleIT extends ESIntegTestCase {
         }
         refresh();
 
-        double[] searchVec = vectorGenerator.nextVector();
+        double[] searchVec = IntStream.generate(() -> 1).mapToDouble(v -> v).limit(nbDimensions).toArray();
+        searchVec[0] = 0.0;
 
         SimilaritySearchResponse similaritySearchResponse = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
                 searchVec,
@@ -169,7 +171,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
                     Arrays.stream(searchVec).boxed().collect(Collectors.toList())
             )));
         }
-        idDistances.sort(Comparator.comparing(Pair::getSecond));
+        idDistances.sort(Comparator.comparing(Pair::getSecond, Comparator.reverseOrder()));
 
         List<String> greedyIds = idDistances.stream().limit(takeN).map(Pair::getFirst).collect(Collectors.toList());
 
@@ -180,9 +182,9 @@ public class AknnSimpleIT extends ESIntegTestCase {
             }
         }
 
-        System.out.println("Greedy: " + greedyIds.toString());
-        System.out.println("LSH: " + lshIds.toString());
-        System.out.println("Num intersect: " + numContains);
-        assertTrue(numContains >= 6);
+        /*System.out.println("Greedy: " + idDistances.stream().limit(takeN).collect(Collectors.toList()));
+        System.out.println("LSH: " + similaritySearchResponse.hits.hits.stream().map(v -> new Pair<>(v._id, v._score)).collect(Collectors.toList()));
+        System.out.println("Num intersect: " + numContains);*/
+        assertTrue(numContains >= 9);
     }
 }
