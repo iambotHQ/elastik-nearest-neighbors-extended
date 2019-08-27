@@ -16,16 +16,14 @@
  */
 package org.elasticsearch.plugin.aknn;
 
-import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.linear.RealVector;
+import org.apache.commons.math3.random.*;
+import org.apache.commons.math3.util.Pair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class LshModel {
 
@@ -33,73 +31,47 @@ public class LshModel {
     private Integer nbBitsPerTable;
     private Integer nbDimensions;
     private String description;
-    private List<RealMatrix> midpoints;
-    private List<RealMatrix> normals;
-    private List<RealMatrix> normalsTransposed;
-    private List<RealVector> thresholds;
+
+    private List<RealMatrix> bases;
+
+
+    public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description, List<List<Double>> bases) {
+        this.nbTables = nbTables;
+        this.nbBitsPerTable = nbBitsPerTable;
+        this.nbDimensions = nbDimensions;
+        this.description = description;
+
+        RealMatrix concatenatedTables = MatrixUtils.createRealMatrix(nestedListToNestedArraysDouble(bases));
+        // assert nbBitsPerTable == concatenatedTables.getRowDimension() / nbTables; // TODO better inputted bases dimension checking
+
+        this.bases = IntStream.range(0, nbTables)
+                .map(r -> r * nbBitsPerTable)
+                .mapToObj(r -> concatenatedTables.getSubMatrix(r, r + nbBitsPerTable - 1, 0, concatenatedTables.getColumnDimension() - 1))
+                .collect(Collectors.toList());
+    }
 
     public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description) {
         this.nbTables = nbTables;
         this.nbBitsPerTable = nbBitsPerTable;
         this.nbDimensions = nbDimensions;
         this.description = description;
-        this.midpoints = new ArrayList<>();
-        this.normals = new ArrayList<>();
-        this.normalsTransposed = new ArrayList<>();
-        this.thresholds = new ArrayList<>();
+
+        this.bases = this.getRandomNormalVectors(nbTables, nbBitsPerTable, nbDimensions);
     }
 
-    public void fitFromVectorSample(List<List<Double>> vectorSample) {
-
-        RealMatrix vectorsA, vectorsB, midpoint, normal, vectorSampleMatrix;
-        vectorSampleMatrix = MatrixUtils.createRealMatrix(vectorSample.size(), this.nbDimensions);
-
-        for (int i = 0; i < vectorSample.size(); i++)
-            for (int j = 0; j < this.nbDimensions; j++)
-                vectorSampleMatrix.setEntry(i, j, vectorSample.get(i).get(j));
-
-        for (int i = 0; i < vectorSampleMatrix.getRowDimension(); i += (nbBitsPerTable * 2)) {
-            // Select two subsets of nbBitsPerTable vectors.
-            vectorsA = vectorSampleMatrix.getSubMatrix(i, i + nbBitsPerTable - 1, 0, nbDimensions - 1);
-            vectorsB = vectorSampleMatrix.getSubMatrix(i + nbBitsPerTable, i + 2 * nbBitsPerTable - 1, 0, nbDimensions - 1);
-
-            // Compute the midpoint between each pair of vectors.
-            midpoint = vectorsA.add(vectorsB).scalarMultiply(0.5);
-            midpoints.add(midpoint);
-
-            // Compute the normal vectors for each pair of vectors.
-            normal = vectorsB.subtract(midpoint);
-            normals.add(normal);
-        }
-
-    }
-
-    public Map<String, Long> getVectorHashes(List<Double> vector) {
-
-        RealMatrix xDotNT, vectorAsMatrix;
-        RealVector threshold;
-        Map<String, Long> hashes = new HashMap<>();
-        Long hash;
-        Integer i, j;
-
-        // Have to convert the vector to a matrix to support multiplication below.
-        // TODO: if the List<Double> vector argument can be changed to an Array double[] or float[], this would be faster.
-        vectorAsMatrix = MatrixUtils.createRealMatrix(1, nbDimensions);
-        for (i = 0; i < nbDimensions; i++)
-            vectorAsMatrix.setEntry(0, i, vector.get(i));
-
-        // Compute the hash for this vector with respect to each table.
-        for (i = 0; i < nbTables; i++) {
-            xDotNT = vectorAsMatrix.multiply(normalsTransposed.get(i));
-            threshold = thresholds.get(i);
-            hash = 0L;
-            for (j = 0; j < nbBitsPerTable; j++)
-                if (xDotNT.getEntry(0, j) > threshold.getEntry(j))
-                    hash += (long) Math.pow(2, j);
-            hashes.put(i.toString(), hash);
-        }
-
-        return hashes;
+    public Map<String, Long> getVectorHashes(List<Double> queryVector) {
+        return IntStream.range(0, bases.size()).mapToObj(i -> new Pair<>(Integer.toString(i), bases.get(i)))
+            .collect(Collectors.toMap(
+                Pair::getKey,
+                basePair -> {
+                    RealMatrix queryVectorAsMatrix = MatrixUtils.createColumnRealMatrix(
+                            queryVector.stream().mapToDouble(Double::doubleValue).toArray());
+                    double[] dotProducts = basePair.getValue().multiply(queryVectorAsMatrix).getColumn(0);
+                    long hash = IntStream.range(0, dotProducts.length).mapToLong(i ->
+                            dotProducts[i] >= 0 ? (long) Math.pow(2, i) : 0L).sum();
+                    return hash;
+                }
+        ));
     }
 
     @SuppressWarnings("unchecked")
@@ -109,31 +81,11 @@ public class LshModel {
                 (Integer) serialized.get("_aknn_nb_tables"), (Integer) serialized.get("_aknn_nb_bits_per_table"),
                 (Integer) serialized.get("_aknn_nb_dimensions"), (String) serialized.get("_aknn_description"));
 
-        // TODO: figure out how to cast directly to List<double[][]> or double[][][] and use MatrixUtils.createRealMatrix.
-        List<List<List<Double>>> midpointsRaw = (List<List<List<Double>>>) serialized.get("_aknn_midpoints");
-        List<List<List<Double>>> normalsRaw = (List<List<List<Double>>>) serialized.get("_aknn_normals");
-        for (int i = 0; i < lshModel.nbTables; i++) {
-            RealMatrix midpoint = MatrixUtils.createRealMatrix(lshModel.nbBitsPerTable, lshModel.nbDimensions);
-            RealMatrix normal = MatrixUtils.createRealMatrix(lshModel.nbBitsPerTable, lshModel.nbDimensions);
-            for (int j = 0; j < lshModel.nbBitsPerTable; j++) {
-                for (int k = 0; k < lshModel.nbDimensions; k++) {
-                    midpoint.setEntry(j, k, midpointsRaw.get(i).get(j).get(k));
-                    normal.setEntry(j, k, normalsRaw.get(i).get(j).get(k));
-                }
-            }
-            lshModel.midpoints.add(midpoint);
-            lshModel.normals.add(normal);
-            lshModel.normalsTransposed.add(normal.transpose());
-        }
-
-        for (int i = 0; i < lshModel.nbTables; i++) {
-            RealMatrix normal = lshModel.normals.get(i);
-            RealMatrix midpoint = lshModel.midpoints.get(i);
-            RealVector threshold = new ArrayRealVector(lshModel.nbBitsPerTable);
-            for (int j = 0; j < lshModel.nbBitsPerTable; j++)
-                threshold.setEntry(j, normal.getRowVector(j).dotProduct(midpoint.getRowVector(j)));
-            lshModel.thresholds.add(threshold);
-        }
+        List<List<List<Double>>> basesRaw = (List<List<List<Double>>>) serialized.get("_aknn_bases");
+        lshModel.bases = basesRaw.stream()
+            .map(LshModel::nestedListToNestedArraysDouble)
+            .map(MatrixUtils::createRealMatrix)
+            .collect(Collectors.toList());
 
         return lshModel;
     }
@@ -144,8 +96,29 @@ public class LshModel {
             put("_aknn_nb_bits_per_table", nbBitsPerTable);
             put("_aknn_nb_dimensions", nbDimensions);
             put("_aknn_description", description);
-            put("_aknn_midpoints", midpoints.stream().map(realMatrix -> realMatrix.getData()).collect(Collectors.toList()));
-            put("_aknn_normals", normals.stream().map(normals -> normals.getData()).collect(Collectors.toList()));
+            put("_aknn_bases", bases.stream().map(RealMatrix::getData).collect(Collectors.toList()));
         }};
+    }
+
+    private static double[][] nestedListToNestedArraysDouble(List<List<Double>> data) {
+        return data.stream()
+                .map(a -> a.stream().mapToDouble(Double::doubleValue).toArray())
+                .toArray(double[][]::new);
+    }
+
+    private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {
+        RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
+        GaussianRandomGenerator scalarGenerator = new GaussianRandomGenerator(rg);
+        UncorrelatedRandomVectorGenerator vectorGenerator = new UncorrelatedRandomVectorGenerator(nbDimensions, scalarGenerator);
+
+        ArrayList<RealMatrix> matrices = new ArrayList<>();
+        for(int i = 0; i < nbTables; i++) {
+            double[][] d = new double[nbBitsPerTable][];
+            for(int j = 0; j < nbBitsPerTable; j++) {
+                d[j] = vectorGenerator.nextVector();
+            }
+            matrices.add(MatrixUtils.createRealMatrix(d));
+        }
+        return matrices;
     }
 }

@@ -1,0 +1,31 @@
+{
+  "_index":       "twitter_images",
+  "_type":        "_doc",
+  "_aknn_uri":    "aknn_models/aknn_model/twitter_image_search",
+  "_aknn_docs": [
+    {
+      "_id": "1",
+      "_source": {
+        "_aknn_vector": [1.0, 0.0, 0.0]
+      }
+    },
+    {
+      "_id": "2",
+      "_source": {
+        "_aknn_vector": [1.0, 1.0, 0.0]
+      }
+    },
+    {
+      "_id": "3",
+      "_source": {
+        "_aknn_vector": [0.0, 1.0, 0.0]
+      }
+    },
+    {
+      "_id": "4",
+      "_source": {
+        "_aknn_vector": [0.0, 1.0, 1.0]
+      }
+    }
+  ]
+}

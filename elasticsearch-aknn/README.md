@@ -29,7 +29,7 @@ Java `Double [][]` to `RealMatrix`.
 hyperplanes should not be indexed and can likely be stored as `half_float` / Java `float`)
 to save space / network latency.
 5. Enforce an explicit mapping and types for `_aknn_vector` and `_aknn_hashes`
-entries. For example, `_aknn_vector` should not be indexed and can likley be
+entries. For example, `_aknn_vector` should not be indexed and can likely be
 stored as a `half_float` / Java `float`.
 6. Determine a proper place for defining/changing plugin configurations. For
 example, the name of the vector and hashes items.
