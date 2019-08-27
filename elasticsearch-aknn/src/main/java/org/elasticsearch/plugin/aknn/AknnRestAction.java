@@ -243,9 +243,9 @@ public class AknnRestAction extends BaseRestHandler {
             }
 
             Double computedScore;
-            if(rescore == RESCORE_COSINE) {
+            if(rescore.equals(RESCORE_COSINE)) {
                 computedScore = cosineSimilarity(queryVector, hitVector);
-            } else if(rescore == RESCORE_EUCLIDEAN) {
+            } else if(rescore.equals(RESCORE_EUCLIDEAN)) {
                 computedScore = euclideanDistance(queryVector, hitVector);
             } else {
                 computedScore = (double) hit.getScore();
@@ -261,7 +261,7 @@ public class AknnRestAction extends BaseRestHandler {
         }
         stopWatch.stop();
 
-        if (rescore != RESCORE_NONE) {
+        if (!rescore.equals(RESCORE_NONE)) {
             logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
             modifiedSortedHits.sort(Comparator.comparingDouble(x -> (Double) x.get("_score")));
