@@ -67,7 +67,6 @@ public class AknnRestAction extends BaseRestHandler {
     private final String NAME_CREATE_RANDOM = "_aknn_create_random";
     private final String NAME_CLEAR_CACHE = "_aknn_clear_cache";
 
-    private final String RESCORE_EUCLIDEAN = "EUCLIDEAN";
     private final String RESCORE_COSINE = "COSINE";
     private final String RESCORE_NONE = "NONE";
 
@@ -137,13 +136,6 @@ public class AknnRestAction extends BaseRestHandler {
         }
     }
 
-    public static Double euclideanDistance(List<Double> A, List<Double> B) {
-        Double squaredDistance = 0.;
-        for (Integer i = 0; i < A.size(); i++)
-            squaredDistance += Math.pow(A.get(i) - B.get(i), 2);
-        return Math.sqrt(squaredDistance);
-    }
-
     public static Double cosineSimilarity(List<Double> A, List<Double> B) {
         double dotProduct = 0.0;
         double normA = 0.0;
@@ -154,7 +146,7 @@ public class AknnRestAction extends BaseRestHandler {
             normA += Math.pow(a, 2.0);
             normB += Math.pow(b, 2.0);
         }
-        return 1.0 - Math.abs(dotProduct) / (Math.sqrt(normA) * Math.sqrt(normB));
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
 	// Loading LSH model refactored as function
@@ -245,8 +237,6 @@ public class AknnRestAction extends BaseRestHandler {
             Double computedScore;
             if(rescore.equals(RESCORE_COSINE)) {
                 computedScore = cosineSimilarity(queryVector, hitVector);
-            } else if(rescore.equals(RESCORE_EUCLIDEAN)) {
-                computedScore = euclideanDistance(queryVector, hitVector);
             } else {
                 computedScore = (double) hit.getScore();
             }
@@ -264,7 +254,7 @@ public class AknnRestAction extends BaseRestHandler {
         if (!rescore.equals(RESCORE_NONE)) {
             logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
-            modifiedSortedHits.sort(Comparator.comparingDouble(x -> (Double) x.get("_score")));
+            modifiedSortedHits.sort(Comparator.comparing(x -> (Double) x.get("_score"), Comparator.reverseOrder()));
             stopWatch.stop();
         } else {
             logger.debug("Exact distance rescoring passed");

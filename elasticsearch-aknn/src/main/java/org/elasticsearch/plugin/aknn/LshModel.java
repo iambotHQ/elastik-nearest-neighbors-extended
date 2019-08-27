@@ -16,13 +16,9 @@
  */
 package org.elasticsearch.plugin.aknn;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.random.GaussianRandomGenerator;
-import org.apache.commons.math3.random.RandomDataGenerator;
-import org.apache.commons.math3.random.RandomGenerator;
-import org.apache.commons.math3.random.UncorrelatedRandomVectorGenerator;
+import org.apache.commons.math3.random.*;
 import org.apache.commons.math3.util.Pair;
 
 import java.util.*;
@@ -72,7 +68,7 @@ public class LshModel {
                             queryVector.stream().mapToDouble(Double::doubleValue).toArray());
                     double[] dotProducts = basePair.getValue().multiply(queryVectorAsMatrix).getColumn(0);
                     long hash = IntStream.range(0, dotProducts.length).mapToLong(i ->
-                            dotProducts[i] > 0 ? (long) Math.pow(2, i) : 0L).sum();
+                            dotProducts[i] >= 0 ? (long) Math.pow(2, i) : 0L).sum();
                     return hash;
                 }
         ));
