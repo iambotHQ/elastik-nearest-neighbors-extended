@@ -13,17 +13,17 @@ public class RequestFactory {
     public static String modelType = "aknn_model";
     public static String modelId = "twitter_image_search";
 
-    public static CreateModelRequest createModelRequest(int nbTables, int nbBits) {
+    public static CreateModelRequest createModelRequest(int nbTables, int nbBits, int nbDimensions) {
         return new CreateModelRequest(
                 modelIndex,
                 modelType,
                 modelId,
-            new CreateModelRequest.Source(
-                    "LSH model for Twitter image similarity search",
-                    nbTables,
-                    nbBits,
-                    3
-            )
+                new CreateModelRequest.Source(
+                        "LSH model for Twitter image similarity search",
+                        nbTables,
+                        nbBits,
+                        nbDimensions
+                )
         );
     }
 

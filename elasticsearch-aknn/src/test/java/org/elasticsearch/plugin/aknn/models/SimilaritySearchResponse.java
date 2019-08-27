@@ -1,13 +1,23 @@
 package org.elasticsearch.plugin.aknn.models;
 
 import java.util.List;
+import java.util.Map;
 
 public class SimilaritySearchResponse {
+    public static class HitSource {
+        public Map<String, Long> _aknn_hashes;
+
+        public HitSource(Map<String, Long> _aknn_hashes) {
+            this._aknn_hashes = _aknn_hashes;
+        }
+    }
+
     public static class Hit {
-        public String source, _id;
+        public HitSource source;
+        public String _id;
         public double _score;
 
-        public Hit(String source, String _id, double _score) {
+        public Hit(HitSource source, String _id, double _score) {
             this.source = source;
             this._id = _id;
             this._score = _score;

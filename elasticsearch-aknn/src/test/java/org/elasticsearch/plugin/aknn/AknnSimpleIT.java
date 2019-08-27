@@ -17,6 +17,10 @@
 
 package org.elasticsearch.plugin.aknn;
 
+import org.apache.commons.math3.random.GaussianRandomGenerator;
+import org.apache.commons.math3.random.RandomDataGenerator;
+import org.apache.commons.math3.random.RandomGenerator;
+import org.apache.commons.math3.random.UncorrelatedRandomVectorGenerator;
 import org.apache.commons.math3.util.Pair;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Request;
@@ -30,6 +34,7 @@ import org.elasticsearch.plugin.aknn.utils.AknnAPI;
 import org.elasticsearch.plugin.aknn.utils.RequestFactory;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -52,10 +57,6 @@ public class AknnSimpleIT extends ESIntegTestCase {
         aknnAPI = new AknnAPI(restClient);
     }
 
-    private void refreshAll() {
-        flushAndRefresh(RequestFactory.index, RequestFactory.modelIndex);
-    }
-
     /**
      * Test that the plugin was installed correctly by hitting the _cat/plugins endpoint.
      * @throws IOException if performing a request fails
@@ -71,9 +72,9 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testSearchResultsOrder() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18));
+        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18, 3));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
-        refreshAll();
+        refresh();
 
         SimilaritySearchResponse similaritySearchResponse = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
                 new double[]{ 1.0, 0.0, 0.0 },
@@ -84,7 +85,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
         assertNotNull(similaritySearchResponse.hits.hits);
         for(int i = 0; i < 4; i++) {
             if(similaritySearchResponse.hits.hits.size() > i) {
-                assertEquals(similaritySearchResponse.hits.hits.get(i)._id, String.valueOf(i + 1));
+                assertEquals(String.valueOf(i + 1), similaritySearchResponse.hits.hits.get(i)._id);
             }
         }
     }
@@ -94,31 +95,31 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testVectorUpdate() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18));
+        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18, 3));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
-        refreshAll();
+        refresh();
 
         GetVectorResponse getVectorResponse = aknnAPI.getVector("twitter_images", "_doc", "1");
         assertEquals(getVectorResponse._id, "1");
         assertNotNull(getVectorResponse._source);
         assertNotNull(getVectorResponse._source._aknn_vector);
-        assertEquals(getVectorResponse._source._aknn_vector.length, 3);
+        assertEquals(3, getVectorResponse._source._aknn_vector.length);
         assertEquals(getVectorResponse._source._aknn_vector[0], 1.0, 0.001);
         assertEquals(getVectorResponse._source._aknn_vector[1], 0.0, 0.0);
         assertEquals(getVectorResponse._source._aknn_vector[2], 0.3, 0.001);
 
         CreateIndexRequest.Doc docIdx = new CreateIndexRequest.Doc("1", new CreateIndexRequest.Source(new double[]{ 0.0, 0.0, 0.0 }));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(Collections.singletonList(docIdx)));
-        refreshAll();
+        refresh();
 
         getVectorResponse = aknnAPI.getVector("twitter_images", "_doc", "1");
         assertEquals(getVectorResponse._id, "1");
         assertNotNull(getVectorResponse._source);
         assertNotNull(getVectorResponse._source._aknn_vector);
-        assertEquals(getVectorResponse._source._aknn_vector.length, 3);
-        assertEquals(getVectorResponse._source._aknn_vector[0], 0.0, 0.0);
-        assertEquals(getVectorResponse._source._aknn_vector[1], 0.0, 0.0);
-        assertEquals(getVectorResponse._source._aknn_vector[2], 0.0, 0.0);
+        assertEquals(3, getVectorResponse._source._aknn_vector.length);
+        assertEquals(0.0, getVectorResponse._source._aknn_vector[0], 0.0);
+        assertEquals(0.0, getVectorResponse._source._aknn_vector[1], 0.0);
+        assertEquals(0.0, getVectorResponse._source._aknn_vector[2], 0.0);
     }
 
     /**
@@ -126,48 +127,47 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testLSHBig() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
         final int batchSize = 1000;
         final int numBatches = 10;
-
-        Random rand = new Random(55626L);
+        final int nbDimensions = 50;
+        final int takeN = 10;
+        final int k1 = 500;
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 12, nbDimensions));
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
+        RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
+        rg.setSeed(55626L);
+        GaussianRandomGenerator scalarGenerator = new GaussianRandomGenerator(rg);
+        UncorrelatedRandomVectorGenerator vectorGenerator = new UncorrelatedRandomVectorGenerator(nbDimensions, scalarGenerator);
         for(int j = 0; j < numBatches; j++) {
             List<CreateIndexRequest.Doc> docs = new ArrayList<>();
             for (int i = 0; i < batchSize; i++) {
-                double alpha = rand.nextDouble() * Math.PI * 2;
-                double beta = rand.nextDouble() * Math.PI * 2;
-                double x = Math.cos(alpha) * Math.cos(beta);
-                double z = Math.sin(alpha) * Math.cos(beta);
-                double y = Math.sin(beta);
-                CreateIndexRequest.Source source = new CreateIndexRequest.Source(new double[]{x, y, z});
+                CreateIndexRequest.Source source = new CreateIndexRequest.Source(vectorGenerator.nextVector());
                 docs.add(new CreateIndexRequest.Doc(String.valueOf(j * batchSize + i), source));
             }
             aknnAPI.createIndex(RequestFactory.createIndexRequest(docs));
             documents.addAll(docs);
         }
-        refreshAll();
+        refresh();
 
-        double[] searchVec = new double[]{ 1.0, 0.0, 0.0 };
-        int takeN = 10;
+        double[] searchVec = vectorGenerator.nextVector();
 
         SimilaritySearchResponse similaritySearchResponse = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
                 searchVec,
-                1000,
+                k1,
                 takeN
         )));
         assertNotNull(similaritySearchResponse.hits);
         assertNotNull(similaritySearchResponse.hits.hits);
-        assertEquals(similaritySearchResponse.hits.hits.size(), takeN);
+        assertEquals(takeN, similaritySearchResponse.hits.hits.size());
         List<String> lshIds = similaritySearchResponse.hits.hits.stream().map((hit) -> hit._id).collect(Collectors.toList());
 
         // greedy cosine similarity
         List<Pair<String, Double>> idDistances = new ArrayList<>();
         for(CreateIndexRequest.Doc doc : documents) {
-            idDistances.add(new Pair<>(doc._id, Math.abs(AknnRestAction.cosineSimilarity(
+            idDistances.add(new Pair<>(doc._id, AknnRestAction.cosineSimilarity(
                     Arrays.stream(doc._source._aknn_vector).boxed().collect(Collectors.toList()),
                     Arrays.stream(searchVec).boxed().collect(Collectors.toList())
-            ))));
+            )));
         }
         idDistances.sort(Comparator.comparing(Pair::getSecond));
 

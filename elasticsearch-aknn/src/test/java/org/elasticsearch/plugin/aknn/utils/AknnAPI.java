@@ -8,12 +8,7 @@ import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.plugin.aknn.models.*;
-
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.stream.Collectors;
 
 public class AknnAPI {
     RestClient restClient;
@@ -21,15 +16,6 @@ public class AknnAPI {
 
     public AknnAPI(RestClient restClient) {
         this.restClient = restClient;
-    }
-
-    public String getResourceFileAsString(String fileName) {
-        InputStream is = getClass().getClassLoader().getResourceAsStream(fileName);
-        if (is != null) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-        }
-        return null;
     }
 
     public Response performJSONRequest(String json, String endpoint, String method) throws IOException {
@@ -49,11 +35,11 @@ public class AknnAPI {
     }
 
     public void createIndex(CreateIndexRequest request) throws IOException {
-        performJSONRequest(gson.toJson(request), "_aknn_index");
+        performJSONRequest(gson.toJson(request), "_aknn_index?clear_cache=true");
     }
 
     public SimilaritySearchResponse similaritySearch(SimilaritySearchRequest request) throws IOException {
-        Response response = performJSONRequest(gson.toJson(request), "_aknn_search_vec");
+        Response response = performJSONRequest(gson.toJson(request), "_aknn_search_vec?debug=true");
         return gson.fromJson(EntityUtils.toString(response.getEntity()), SimilaritySearchResponse.class);
     }
 

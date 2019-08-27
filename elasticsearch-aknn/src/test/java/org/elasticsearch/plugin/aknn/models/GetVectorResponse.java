@@ -1,13 +1,15 @@
 package org.elasticsearch.plugin.aknn.models;
 
-import java.util.List;
+import java.util.Map;
 
 public class GetVectorResponse {
     public static class Source {
         public double[] _aknn_vector;
+        public Map<String, Long> _aknn_hashes;
 
-        public Source(double[] _aknn_vector) {
+        public Source(double[] _aknn_vector, Map<String, Long> _aknn_hashes) {
             this._aknn_vector = _aknn_vector;
+            this._aknn_hashes = _aknn_hashes;
         }
     }
 
