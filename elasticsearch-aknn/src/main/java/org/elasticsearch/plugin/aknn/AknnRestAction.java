@@ -41,7 +41,6 @@ import org.elasticsearch.rest.RestController;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -136,12 +135,12 @@ public class AknnRestAction extends BaseRestHandler {
         }
     }
 
-    public static Double cosineSimilarity(List<Double> A, List<Double> B) {
+    public static Double cosineSimilarity(List<Double> first, List<Double> second) {
         double dotProduct = 0.0;
         double normA = 0.0;
         double normB = 0.0;
-        for (int i = 0, s = A.size(); i < s; i++) {
-            double a = A.get(i), b = B.get(i);
+        for (int i = 0; i < first.size(); i++) {
+            double a = first.get(i), b = second.get(i);
             dotProduct += a * b;
             normA += Math.pow(a, 2.0);
             normB += Math.pow(b, 2.0);
@@ -151,7 +150,7 @@ public class AknnRestAction extends BaseRestHandler {
 
 	// Loading LSH model refactored as function
     //TODO Fix issues with stopwatch 
-    public LshModel InitLsh(String aknnURI, NodeClient client) {
+    public LshModel initLsh(String aknnURI, NodeClient client) {
         LshModel lshModel;
         StopWatch stopWatch = new StopWatch("StopWatch to load LSH cache");
         if (!lshModelCache.containsKey(aknnURI)) {
@@ -182,7 +181,7 @@ public class AknnRestAction extends BaseRestHandler {
     }
 
 	//  Query execution refactored as function and added wrapper query
-    private List<Map<String, Object>> QueryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, String rescore, String filterString, Integer minimum_should_match, Boolean debug, NodeClient client) {
+    private List<Map<String, Object>> queryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, String rescore, String filterString, Integer minimumShouldMatch, Boolean debug, NodeClient client) {
         // Retrieve the documents with most matching hashes. https://stackoverflow.com/questions/10773581
         StopWatch stopWatch = new StopWatch("StopWatch to query LSH cache");
         logger.debug("Build boolean query from hashes");
@@ -192,7 +191,7 @@ public class AknnRestAction extends BaseRestHandler {
             String termKey = HASHES_KEY + "." + entry.getKey();
             queryBuilder.should(QueryBuilders.termQuery(termKey, entry.getValue()));
         }
-        queryBuilder.minimumShouldMatch(minimum_should_match);
+        queryBuilder.minimumShouldMatch(minimumShouldMatch);
 
         if (filterString != null) {
             queryBuilder.filter(new WrapperQueryBuilder(filterString));
@@ -292,7 +291,7 @@ public class AknnRestAction extends BaseRestHandler {
         final String filter = restRequest.param("filter", null);
         final Integer k1 = restRequest.paramAsInt("k1", K1_DEFAULT);
         final Integer k2 = restRequest.paramAsInt("k2", K2_DEFAULT);
-        final Integer minimum_should_match = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
+        final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
         stopWatch.stop();
@@ -315,7 +314,7 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         stopWatch.start("Query nearest neighbors");
-        List<Map<String, Object>> modifiedSortedHits = QueryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimum_should_match, debug, client);
+        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client);
 
         stopWatch.stop();
 
@@ -388,21 +387,21 @@ public class AknnRestAction extends BaseRestHandler {
         final String aknnURI = (String) contentMap.get("_aknn_uri");
         final Integer k1 = (Integer) aknnQueryMap.get("k1");
         final Integer k2 = (Integer) aknnQueryMap.get("k2");
-        final Integer minimum_should_match = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
+        final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
-        final Boolean clear_cache = restRequest.paramAsBoolean("clear_cache", false);
+        final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
 
         @SuppressWarnings("unchecked")
         List<Double> queryVector = (List<Double>) aknnQueryMap.get(VECTOR_KEY);
         stopWatch.stop();
         // Clear LSH model cache if requested
-        if (clear_cache == true) {
+        if (clearCache) {
             // Clear LSH model cache
             lshModelCache.remove(aknnURI);
         }
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
-        LshModel lshModel = InitLsh(aknnURI, client);
+        LshModel lshModel = initLsh(aknnURI, client);
 
         stopWatch.start("Query nearest neighbors");
         @SuppressWarnings("unchecked")
@@ -410,7 +409,7 @@ public class AknnRestAction extends BaseRestHandler {
         //logger.debug("HASHES: {}", queryHashes);
 
 
-        List<Map<String, Object>> modifiedSortedHits = QueryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimum_should_match, debug, client);
+        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client);
         stopWatch.stop();
         logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
         return channel -> {
@@ -507,7 +506,7 @@ public class AknnRestAction extends BaseRestHandler {
         final String index = (String) contentMap.get("_index");
         final String type = (String) contentMap.get("_type");
         final String aknnURI = (String) contentMap.get("_aknn_uri");
-        final Boolean clear_cache = restRequest.paramAsBoolean("clear_cache", false);
+        final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         @SuppressWarnings("unchecked") final List<Map<String, Object>> docs = (List<Map<String, Object>>) contentMap.get("_aknn_docs");
         logger.debug("Received {} docs for indexing", docs.size());
         stopWatch.stop();
@@ -516,12 +515,12 @@ public class AknnRestAction extends BaseRestHandler {
         // This is rather low priority, as I tried it via Python and it doesn't make much difference.
 
         // Clear LSH model cache if requested
-        if (clear_cache == true) {
+        if (clearCache) {
             // Clear LSH model cache
             lshModelCache.remove(aknnURI);
         }
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
-        LshModel lshModel = InitLsh(aknnURI, client);
+        LshModel lshModel = initLsh(aknnURI, client);
 
         // Prepare documents for batch indexing.
         logger.debug("Hash documents for indexing");
