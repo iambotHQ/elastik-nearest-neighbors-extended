@@ -1,6 +1,6 @@
 ## Changes
 
-This fork builds on SthPhoenix's fork and aims to remove the need to manually provide vector sample for `_akn_create` endpoint, while removing some unnecessary complexities and generally hightening code quality.
+This fork builds on SthPhoenix's fork and aims to remove the need to manually provide vector samples for `_akn_create` endpoint, moving to cosine distance, removing unnecessary complexities and improving code quality.
 
 ***
 _SthPhoenix's readme_
@@ -13,7 +13,7 @@ _SthPhoenix's readme_
 
      Usage example:
      ```
-     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=EUCLIDEAN&debug=false&minimum_should_match=1&clear_cache=false
+     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=COSINE&debug=false&minimum_should_match=1&clear_cache=false
      {
          "_index":       "twitter_images",
          "_type":        "_doc",
@@ -38,7 +38,7 @@ _SthPhoenix's readme_
 3. **`_aknn_create_random`** - Creates a model providing random vector samples
 
 ### Added new request arguments:
-1. **rescore (_boolean_)** - One of `COSINE` *(default)*, `EUCLIDEAN` or `NONE`. Upon finding similar items by number of matching hashes, you may wish to calculate their cosine/euclidean similarity score and sort the results accordingly (ascending, from most similar to least).
+1. **rescore (_boolean_)** - One of `COSINE` *(default)* or `NONE`. Upon finding similar items by number of matching hashes, you may wish to calculate their cosine similarity score and sort the results accordingly (ascending, from most similar to least).
 2. **debug (_boolean_)** - keep original vectors and hashes if set to true, usefull for tinkering with metrics and scoring, also might be usefull for clustering query results.
 3. **minimum_should_match (_integer_)** - changing corresponding ES bool query argument, might improve search speed by lowering number of hits ES should score.
 4. **filter (_string_)** - ES [bool query](https://www.elastic.co/guide/en/elasticsearch/reference/6.5/query-filter-context.html) filter as string. Is a string you would normaly put inside a filter clause, i.e if your filter looks like this: 
@@ -233,7 +233,7 @@ This returns:
             {
                 "_id": "...",
                 '_index': "twitter_images",
-                "_score": <euclidean distance from query vector to this vector>,
+                "_score": <cosine distance from query vector to this vector>,
                 '_source': {
                     # All of the document fields except for the potentially
                     # large fields containing the vector and hashes.
@@ -264,7 +264,7 @@ efficiently indexed and retrieved in Elasticsearch.
 to find `k1` approximate nearest neighbors based on discrete hashes. It then 
 computes the exact distance to each of these approximate neighbors and returns 
 the `k2` closest. For example, you might set `k1 = 1000` and `k2 = 10`.
-6. EsAknn currently only implements euclidean distance, but any distance
+6. EsAknn currently only implements cosine distance, but any distance
 function compatible with LSH can be added.
 
 ### Performance
