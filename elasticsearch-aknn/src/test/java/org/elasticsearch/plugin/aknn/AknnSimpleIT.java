@@ -66,11 +66,11 @@ public class AknnSimpleIT extends ESIntegTestCase {
     }
 
     /**
-     * Test that search results returned by _aknn_search_vec are in correct order
+     * Test that search results returned by _aknn_search_vec are sorted from most similar to least by default
      * @throws IOException if performing a request fails
      */
-    public void testSearchResultsOrder() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18, 3));
+    public void testSearchResultsSimilarityOrder() throws IOException {
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1, 3));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
         refresh();
 
@@ -81,10 +81,41 @@ public class AknnSimpleIT extends ESIntegTestCase {
         )));
         assertNotNull(similaritySearchResponse.hits);
         assertNotNull(similaritySearchResponse.hits.hits);
-        for(int i = 0; i < 4; i++) {
-            if(similaritySearchResponse.hits.hits.size() > i) {
-                assertEquals(String.valueOf(i + 1), similaritySearchResponse.hits.hits.get(i)._id);
-            }
+        for(int i = 0; i < similaritySearchResponse.hits.hits.size(); i++) {
+            assertEquals(String.valueOf(i + 1), similaritySearchResponse.hits.hits.get(i)._id);
+        }
+    }
+
+    /**
+     * Test that param order works
+     * @throws IOException if performing a request fails
+     */
+    public void testSearchResultsOrder() throws IOException {
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1, 3));
+        aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
+        refresh();
+
+        SimilaritySearchResponse desc = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
+                new double[]{ 1.0, 0.0, 0.0 },
+                1000,
+                10
+        )), true);
+        assertNotNull(desc.hits);
+        assertNotNull(desc.hits.hits);
+
+        SimilaritySearchResponse asc = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
+                new double[]{ 1.0, 0.0, 0.0 },
+                1000,
+                10
+        )), false);
+        assertNotNull(asc.hits);
+        assertNotNull(asc.hits.hits);
+        assertEquals(desc.hits.hits.size(), asc.hits.hits.size());
+        for(int i = 0; i < desc.hits.hits.size(); i++) {
+            assertEquals(String.valueOf(i + 1), desc.hits.hits.get(i)._id);
+        }
+        for(int i = 0; i < asc.hits.hits.size(); i++) {
+            assertEquals(String.valueOf(asc.hits.hits.size() - i), asc.hits.hits.get(i)._id);
         }
     }
 

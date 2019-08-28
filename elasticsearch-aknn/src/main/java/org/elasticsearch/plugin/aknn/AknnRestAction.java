@@ -181,7 +181,9 @@ public class AknnRestAction extends BaseRestHandler {
     }
 
 	//  Query execution refactored as function and added wrapper query
-    private List<Map<String, Object>> queryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index, String type, Integer k1, String rescore, String filterString, Integer minimumShouldMatch, Boolean debug, NodeClient client) {
+    private List<Map<String, Object>> queryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index,
+                                               String type, Integer k1, String rescore, String filterString, Integer minimumShouldMatch,
+                                               Boolean debug, NodeClient client, Boolean orderDesc) {
         // Retrieve the documents with most matching hashes. https://stackoverflow.com/questions/10773581
         StopWatch stopWatch = new StopWatch("StopWatch to query LSH cache");
         logger.debug("Build boolean query from hashes");
@@ -253,7 +255,8 @@ public class AknnRestAction extends BaseRestHandler {
         if (!rescore.equals(RESCORE_NONE)) {
             logger.debug("Sort search hits by exact distance");
             stopWatch.start("Sort search hits by exact distance");
-            modifiedSortedHits.sort(Comparator.comparing(x -> (Double) x.get("_score"), Comparator.reverseOrder()));
+            Comparator<Double> order = orderDesc ? Comparator.reverseOrder() : Comparator.naturalOrder();
+            modifiedSortedHits.sort(Comparator.comparing(x -> (Double) x.get("_score"), order));
             stopWatch.stop();
         } else {
             logger.debug("Exact distance rescoring passed");
@@ -278,6 +281,7 @@ public class AknnRestAction extends BaseRestHandler {
          * @param  minimum_should_match    number of hashes should match for hit to be returned
          * @param  rescore  If set to 'True' will return results without exact matching stage
          * @param  debug    If set to 'True' will include original vectors and hashes in hits
+         * @param  order    One of 'asc' or 'desc' (default)
          * @return          Return search hits
          */
 
@@ -294,6 +298,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
+        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
         stopWatch.stop();
 
         logger.debug("Get query document at {}/{}/{}", index, type, id);
@@ -314,7 +319,7 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         stopWatch.start("Query nearest neighbors");
-        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client);
+        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
 
         stopWatch.stop();
 
@@ -355,6 +360,7 @@ public class AknnRestAction extends BaseRestHandler {
          * @param  minimum_should_match    number of hashes should match for hit to be returned
          * @param  rescore      If set to 'True' will return results without exact matching stage
          * @param  debug        If set to 'True' will include original vectors and hashes in hits
+         * @param  order        One of 'asc' or 'desc' (default)
 		 * @param  clear_cache  Force update LSH model cache before executing hashing.
          * @return          Return search hits
          */
@@ -391,6 +397,7 @@ public class AknnRestAction extends BaseRestHandler {
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
+        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
 
         @SuppressWarnings("unchecked")
         List<Double> queryVector = (List<Double>) aknnQueryMap.get(VECTOR_KEY);
@@ -409,7 +416,7 @@ public class AknnRestAction extends BaseRestHandler {
         //logger.debug("HASHES: {}", queryHashes);
 
 
-        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client);
+        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
         stopWatch.stop();
         logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
         return channel -> {

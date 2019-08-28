@@ -9,6 +9,7 @@ import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.plugin.aknn.models.*;
 import java.io.IOException;
+import java.util.Optional;
 
 public class AknnAPI {
     RestClient restClient;
@@ -36,6 +37,11 @@ public class AknnAPI {
 
     public void createIndex(CreateIndexRequest request) throws IOException {
         performJSONRequest(gson.toJson(request), "_aknn_index?clear_cache=true");
+    }
+
+    public SimilaritySearchResponse similaritySearch(SimilaritySearchRequest request, boolean orderDesc) throws IOException {
+        Response response = performJSONRequest(gson.toJson(request), "_aknn_search_vec?debug=true&order=" + (orderDesc ? "desc" : "asc"));
+        return gson.fromJson(EntityUtils.toString(response.getEntity()), SimilaritySearchResponse.class);
     }
 
     public SimilaritySearchResponse similaritySearch(SimilaritySearchRequest request) throws IOException {
