@@ -189,9 +189,10 @@ and store its raw and hashed values in an Elasticsearch document.
 POST <elasticsearch host>:9200/_aknn_index
 
 {
-    "_index":       "twitter_images",
-    "_type":        "twitter_image",
-    "_aknn_uri":    "aknn_models/aknn_model/twitter_image_search"
+    "_index":          "twitter_images",
+    "_type":           "twitter_image",
+    "_aknn_uri":       "aknn_models/aknn_model/twitter_image_search"
+    "retryOnConflict": 5,
     "_aknn_docs": [
         {
             "_id": 1,

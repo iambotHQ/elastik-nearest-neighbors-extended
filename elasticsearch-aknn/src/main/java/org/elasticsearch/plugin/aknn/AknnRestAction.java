@@ -506,6 +506,7 @@ public class AknnRestAction extends BaseRestHandler {
         final String index = (String) contentMap.get("_index");
         final String type = (String) contentMap.get("_type");
         final String aknnURI = (String) contentMap.get("_aknn_uri");
+        final int retryOnConflict = restRequest.paramAsInt("retryOnConflict", 5);
         final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         @SuppressWarnings("unchecked") final List<Map<String, Object>> docs = (List<Map<String, Object>>) contentMap.get("_aknn_docs");
         logger.debug("Received {} docs for indexing", docs.size());
@@ -533,8 +534,10 @@ public class AknnRestAction extends BaseRestHandler {
             List<Double> vector = (List<Double>) source.get(VECTOR_KEY);
             source.put(HASHES_KEY, lshModel.getVectorHashes(vector));
             bulkIndexRequest.add(client
-                    .prepareIndex(index, type, String.valueOf(doc.get("_id")))
-                    .setSource(source));
+                    .prepareUpdate(index, type, String.valueOf(doc.get("_id")))
+                    .setDoc(source)
+                    .setRetryOnConflict(retryOnConflict)
+                    .setDocAsUpsert(true));
         }
         stopWatch.stop();
 
