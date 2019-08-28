@@ -174,6 +174,8 @@ POST <elasticsearch host>:9200/_aknn_create_random
 }
 ```
 
+**Note:** *_aknn_nb_dimensions* is optional. If not provided, vector samples will be lazily generated during first vector index request.
+
 This returns:
 
 ```
