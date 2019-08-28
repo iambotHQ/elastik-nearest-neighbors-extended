@@ -468,6 +468,9 @@ public class AknnRestAction extends BaseRestHandler {
         LshModel lshModel;
         if (randomBase) {
             lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description);
+            if(nbDimensions != null) {
+                lshModel.generateBases(nbDimensions);
+            }
         }
         else {
             @SuppressWarnings("unchecked") final List<List<Double>> vectorSample = (List<List<Double>>) contentMap.get("_aknn_vector_sample");
@@ -527,8 +530,26 @@ public class AknnRestAction extends BaseRestHandler {
             // Clear LSH model cache
             lshModelCache.remove(aknnURI);
         }
+
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
         LshModel lshModel = initLsh(aknnURI, client);
+        // lazily generate bases if needed
+        if(!lshModel.hasBases() && docs.size() > 0) {
+            logger.debug("Lazily generate bases");
+            stopWatch.start("Lazily generate bases");
+            Map<String, Object> doc = docs.get(0);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> source = (Map<String, Object>) doc.get("_source");
+            @SuppressWarnings("unchecked")
+            List<Double> vector = (List<Double>) source.get(VECTOR_KEY);
+            lshModel.generateBases(vector.size());
+            Map<String, Object> lshSerialized = lshModel.toMap();
+            String[] annURITokens = aknnURI.split("/");
+            client.prepareIndex(annURITokens[0], annURITokens[1], annURITokens[2])
+                    .setSource(lshSerialized)
+                    .get();
+            stopWatch.stop();
+        }
 
         // Prepare documents for batch indexing.
         logger.debug("Hash documents for indexing");

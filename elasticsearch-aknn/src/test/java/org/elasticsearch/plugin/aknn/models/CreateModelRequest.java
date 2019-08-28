@@ -3,13 +3,20 @@ package org.elasticsearch.plugin.aknn.models;
 public class CreateModelRequest {
     public static class Source {
         public String _aknn_description;
-        public int _aknn_nb_tables, _aknn_nb_bits_per_table, _aknn_nb_dimensions;
+        public int _aknn_nb_tables, _aknn_nb_bits_per_table;
+        public Integer _aknn_nb_dimensions = null;
 
-        public Source(String _aknn_description, int _aknn_nb_tables, int _aknn_nb_bits_per_table, int _aknn_nb_dimensions) {
+        public Source(String _aknn_description, int _aknn_nb_tables, int _aknn_nb_bits_per_table, Integer _aknn_nb_dimensions) {
             this._aknn_description = _aknn_description;
             this._aknn_nb_tables = _aknn_nb_tables;
             this._aknn_nb_bits_per_table = _aknn_nb_bits_per_table;
             this._aknn_nb_dimensions = _aknn_nb_dimensions;
+        }
+
+        public Source(String _aknn_description, int _aknn_nb_tables, int _aknn_nb_bits_per_table) {
+            this._aknn_description = _aknn_description;
+            this._aknn_nb_tables = _aknn_nb_tables;
+            this._aknn_nb_bits_per_table = _aknn_nb_bits_per_table;
         }
     }
 

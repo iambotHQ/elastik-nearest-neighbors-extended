@@ -13,7 +13,7 @@ public class RequestFactory {
     public static String modelType = "aknn_model";
     public static String modelId = "twitter_image_search";
 
-    public static CreateModelRequest createModelRequest(int nbTables, int nbBits, int nbDimensions) {
+    public static CreateModelRequest createModelRequest(int nbTables, int nbBits, Integer nbDimensions) {
         return new CreateModelRequest(
                 modelIndex,
                 modelType,
@@ -25,6 +25,10 @@ public class RequestFactory {
                         nbDimensions
                 )
         );
+    }
+
+    public static CreateModelRequest createModelRequest(int nbTables, int nbBits) {
+        return createModelRequest(nbTables, nbBits, null);
     }
 
     public static CreateIndexRequest createIndexRequest(List<CreateIndexRequest.Doc> docs) {

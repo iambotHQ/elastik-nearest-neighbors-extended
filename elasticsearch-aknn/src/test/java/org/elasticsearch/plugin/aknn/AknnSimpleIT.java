@@ -70,7 +70,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testSearchResultsSimilarityOrder() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1, 3));
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
         refresh();
 
@@ -91,7 +91,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testSearchResultsOrder() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1, 3));
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
         refresh();
 
@@ -124,7 +124,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testVectorUpdate() throws IOException {
-        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18, 3));
+        aknnAPI.createModel(RequestFactory.createModelRequest(64, 18));
         aknnAPI.createIndex(RequestFactory.createIndexRequest(simpleDocs));
         refresh();
 
@@ -161,7 +161,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
         final int nbDimensions = 50;
         final int takeN = 10;
         final int k1 = 500;
-        aknnAPI.createModel(RequestFactory.createModelRequest(100, 8, nbDimensions));
+        aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
         RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
         rg.setSeed(55626L);

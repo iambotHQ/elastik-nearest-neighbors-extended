@@ -55,8 +55,6 @@ public class LshModel {
         this.nbBitsPerTable = nbBitsPerTable;
         this.nbDimensions = nbDimensions;
         this.description = description;
-
-        this.bases = this.getRandomNormalVectors(nbTables, nbBitsPerTable, nbDimensions);
     }
 
     public Map<String, Long> getVectorHashes(List<Double> queryVector) {
@@ -82,10 +80,12 @@ public class LshModel {
                 (Integer) serialized.get("_aknn_nb_dimensions"), (String) serialized.get("_aknn_description"));
 
         List<List<List<Double>>> basesRaw = (List<List<List<Double>>>) serialized.get("_aknn_bases");
-        lshModel.bases = basesRaw.stream()
-            .map(LshModel::nestedListToNestedArraysDouble)
-            .map(MatrixUtils::createRealMatrix)
-            .collect(Collectors.toList());
+        if(basesRaw != null) {
+            lshModel.bases = basesRaw.stream()
+                    .map(LshModel::nestedListToNestedArraysDouble)
+                    .map(MatrixUtils::createRealMatrix)
+                    .collect(Collectors.toList());
+        }
 
         return lshModel;
     }
@@ -96,7 +96,7 @@ public class LshModel {
             put("_aknn_nb_bits_per_table", nbBitsPerTable);
             put("_aknn_nb_dimensions", nbDimensions);
             put("_aknn_description", description);
-            put("_aknn_bases", bases.stream().map(RealMatrix::getData).collect(Collectors.toList()));
+            put("_aknn_bases", bases != null ? bases.stream().map(RealMatrix::getData).collect(Collectors.toList()) : null);
         }};
     }
 
@@ -104,6 +104,15 @@ public class LshModel {
         return data.stream()
                 .map(a -> a.stream().mapToDouble(Double::doubleValue).toArray())
                 .toArray(double[][]::new);
+    }
+
+    public void generateBases(int nbDimensions) {
+        this.nbDimensions = nbDimensions;
+        this.bases = this.getRandomNormalVectors(nbTables, nbBitsPerTable, nbDimensions);
+    }
+
+    public boolean hasBases() {
+        return this.bases != null;
     }
 
     private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {
