@@ -5,9 +5,15 @@ import java.util.List;
 public class CreateIndexRequest {
     public static class Source {
         public double[] _aknn_vector;
+        public String extraData = null;
 
         public Source(double[] _aknn_vector) {
             this._aknn_vector = _aknn_vector;
+        }
+
+        public Source(double[] _aknn_vector, String extraData) {
+            this._aknn_vector = _aknn_vector;
+            this.extraData = extraData;
         }
     }
 

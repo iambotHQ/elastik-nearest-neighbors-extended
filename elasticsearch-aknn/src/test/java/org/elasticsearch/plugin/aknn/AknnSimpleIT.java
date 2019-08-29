@@ -87,6 +87,30 @@ public class AknnSimpleIT extends ESIntegTestCase {
     }
 
     /**
+     * Test that search results returned by _aknn_search_vec contain extra data
+     * @throws IOException if performing a request fails
+     */
+    public void testExtraData() throws IOException {
+        aknnAPI.createModel(RequestFactory.createModelRequest(16, 8));
+        aknnAPI.createIndex(RequestFactory.createIndexRequest(Arrays.asList(
+                new CreateIndexRequest.Doc("1", new CreateIndexRequest.Source(new double[]{ 1.0, 0.0, 0.0 }, "extras!"))
+        )));
+        refresh();
+
+        SimilaritySearchResponse similaritySearchResponse = aknnAPI.similaritySearch(RequestFactory.similaritySearchRequest(new SimilaritySearchRequest.Query(
+                new double[]{ 1.0, 0.0, 0.0 },
+                1000,
+                10
+        )));
+        assertNotNull(similaritySearchResponse.hits);
+        assertNotNull(similaritySearchResponse.hits.hits);
+        assertEquals(1, similaritySearchResponse.hits.hits.size());
+        assertNotNull(similaritySearchResponse.hits.hits.get(0));
+        assertNotNull(similaritySearchResponse.hits.hits.get(0)._source);
+        assertEquals("extras!", similaritySearchResponse.hits.hits.get(0)._source.extraData);
+    }
+
+    /**
      * Test that param order works
      * @throws IOException if performing a request fails
      */

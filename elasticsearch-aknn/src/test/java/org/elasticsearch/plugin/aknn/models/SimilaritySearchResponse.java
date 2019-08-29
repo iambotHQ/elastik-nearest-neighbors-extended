@@ -6,19 +6,21 @@ import java.util.Map;
 public class SimilaritySearchResponse {
     public static class HitSource {
         public Map<String, Long> _aknn_hashes;
+        public String extraData;
 
-        public HitSource(Map<String, Long> _aknn_hashes) {
+        public HitSource(Map<String, Long> _aknn_hashes, String extraData) {
             this._aknn_hashes = _aknn_hashes;
+            this.extraData = extraData;
         }
     }
 
     public static class Hit {
-        public HitSource source;
+        public HitSource _source;
         public String _id;
         public double _score;
 
-        public Hit(HitSource source, String _id, double _score) {
-            this.source = source;
+        public Hit(HitSource _source, String _id, double _score) {
+            this._source = _source;
             this._id = _id;
             this._score = _score;
         }
