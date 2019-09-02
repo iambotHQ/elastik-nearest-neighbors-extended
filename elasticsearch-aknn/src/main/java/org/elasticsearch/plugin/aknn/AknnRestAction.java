@@ -18,6 +18,7 @@ package org.elasticsearch.plugin.aknn;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
@@ -131,6 +132,8 @@ public class AknnRestAction extends BaseRestHandler {
         executorService.submit(task);
         try {
             return task.getResult();
+        } catch(ElasticsearchException e) {
+            throw e;
         } catch(Exception e) {
             throw new AknnException(e);
         }
