@@ -51,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
 import static org.elasticsearch.rest.RestRequest.Method.GET;
@@ -228,8 +229,7 @@ public class AknnRestAction extends BaseRestHandler {
         List<Map<String, Object>> modifiedSortedHits = new ArrayList<>();
         for (SearchHit hit : approximateSearchResponse.getHits()) {
             Map<String, Object> hitSource = hit.getSourceAsMap();
-            @SuppressWarnings("unchecked")
-            List<Double> hitVector = (List<Double>) hitSource.get(VECTOR_KEY);
+            List<Double> hitVector = parseVectorFrom(hitSource);
             if (!debug) {
                 hitSource.remove(VECTOR_KEY);
                 hitSource.remove(HASHES_KEY);
@@ -314,8 +314,7 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         stopWatch.start("Parse query document vector");
-        @SuppressWarnings("unchecked")
-        List<Double> queryVector = (List<Double>) baseSource.get(VECTOR_KEY);
+        List<Double> queryVector = parseVectorFrom(baseSource);
         stopWatch.stop();
 
         stopWatch.start("Query nearest neighbors");
@@ -399,8 +398,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
         final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
 
-        @SuppressWarnings("unchecked")
-        List<Double> queryVector = (List<Double>) aknnQueryMap.get(VECTOR_KEY);
+        List<Double> queryVector = parseVectorFrom(aknnQueryMap);
         stopWatch.stop();
         // Clear LSH model cache if requested
         if (clearCache) {
@@ -541,7 +539,7 @@ public class AknnRestAction extends BaseRestHandler {
             @SuppressWarnings("unchecked")
             Map<String, Object> source = (Map<String, Object>) doc.get("_source");
             @SuppressWarnings("unchecked")
-            List<Double> vector = (List<Double>) source.get(VECTOR_KEY);
+            List<Double> vector = parseVectorFrom(source);
             lshModel.generateBases(vector.size());
             Map<String, Object> lshSerialized = lshModel.toMap();
             String[] annURITokens = aknnURI.split("/");
@@ -558,8 +556,7 @@ public class AknnRestAction extends BaseRestHandler {
         for (Map<String, Object> doc : docs) {
             @SuppressWarnings("unchecked")
             Map<String, Object> source = (Map<String, Object>) doc.get("_source");
-            @SuppressWarnings("unchecked")
-            List<Double> vector = (List<Double>) source.get(VECTOR_KEY);
+            List<Double> vector = parseVectorFrom(source);
             source.put(HASHES_KEY, lshModel.getVectorHashes(vector));
             bulkIndexRequest.add(client
                     .prepareUpdate(index, type, String.valueOf(doc.get("_id")))
@@ -619,5 +616,11 @@ public class AknnRestAction extends BaseRestHandler {
             builder.endObject();
             channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
         };
+    }
+
+    private List<Double> parseVectorFrom(Map<String, Object> source) {
+        @SuppressWarnings("unchecked")
+        List<Object> vec = (List<Object>) source.get(VECTOR_KEY);
+        return vec.stream().map(v -> Double.valueOf(v.toString())).collect(Collectors.toList());
     }
 }
