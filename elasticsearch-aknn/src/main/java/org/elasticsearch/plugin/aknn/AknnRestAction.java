@@ -485,6 +485,7 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.start("Index LSH model");
         client.prepareIndex(_index, _type, _id)
                 .setSource(lshSerialized)
+                .setCreate(true)
                 .get();
         stopWatch.stop();
 

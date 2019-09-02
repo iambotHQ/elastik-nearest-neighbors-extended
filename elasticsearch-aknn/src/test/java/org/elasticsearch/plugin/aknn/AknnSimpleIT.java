@@ -22,6 +22,7 @@ import org.apache.commons.math3.util.Pair;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
+import org.elasticsearch.client.ResponseException;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.plugin.aknn.models.CreateIndexRequest;
 import org.elasticsearch.plugin.aknn.models.SimilaritySearchRequest;
@@ -63,6 +64,21 @@ public class AknnSimpleIT extends ESIntegTestCase {
         Response response = restClient.performRequest(new Request("GET", "_cat/plugins"));
         String body = EntityUtils.toString(response.getEntity());
         assertTrue(body.contains("elasticsearch-aknn"));
+    }
+
+    /**
+     * Test that a model cannot be updated
+     * @throws IOException if performing a request fails
+     */
+    public void testModelCreate() throws IOException {
+        aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
+        refresh();
+        try {
+            aknnAPI.createModel(RequestFactory.createModelRequest(201, 1));
+            fail("CreateModelRequest with the same ID as previous should result in an exception");
+        } catch(ResponseException e) {
+            assertEquals(500, e.getResponse().getStatusLine().getStatusCode());
+        }
     }
 
     /**
