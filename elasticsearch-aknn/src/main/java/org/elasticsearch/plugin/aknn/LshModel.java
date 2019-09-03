@@ -33,6 +33,7 @@ public class LshModel {
     private String description;
 
     private List<RealMatrix> bases;
+    private Long basesSeed = null;
 
 
     public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description, List<List<Double>> bases) {
@@ -51,10 +52,20 @@ public class LshModel {
     }
 
     public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description) {
+        this(nbTables, nbBitsPerTable, nbDimensions, description, (Long) null);
+    }
+
+    public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description, Long basesSeed) {
         this.nbTables = nbTables;
         this.nbBitsPerTable = nbBitsPerTable;
         this.nbDimensions = nbDimensions;
         this.description = description;
+        if(basesSeed == null) {
+            Random r = new Random();
+            this.basesSeed = r.nextLong();
+        } else {
+            this.basesSeed = basesSeed;
+        }
     }
 
     public Map<String, Long> getVectorHashes(List<Double> queryVector) {
@@ -77,7 +88,8 @@ public class LshModel {
 
         LshModel lshModel = new LshModel(
                 (Integer) serialized.get("_aknn_nb_tables"), (Integer) serialized.get("_aknn_nb_bits_per_table"),
-                (Integer) serialized.get("_aknn_nb_dimensions"), (String) serialized.get("_aknn_description"));
+                (Integer) serialized.get("_aknn_nb_dimensions"), (String) serialized.get("_aknn_description"),
+                (Long) serialized.get("_aknn_bases_seed"));
 
         List<List<List<Double>>> basesRaw = (List<List<List<Double>>>) serialized.get("_aknn_bases");
         if(basesRaw != null) {
@@ -96,6 +108,7 @@ public class LshModel {
             put("_aknn_nb_bits_per_table", nbBitsPerTable);
             put("_aknn_nb_dimensions", nbDimensions);
             put("_aknn_description", description);
+            put("_aknn_bases_seed", basesSeed);
             put("_aknn_bases", bases != null ? bases.stream().map(RealMatrix::getData).collect(Collectors.toList()) : null);
         }};
     }
@@ -117,6 +130,7 @@ public class LshModel {
 
     private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {
         RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
+        rg.setSeed(this.basesSeed);
         GaussianRandomGenerator scalarGenerator = new GaussianRandomGenerator(rg);
         UncorrelatedRandomVectorGenerator vectorGenerator = new UncorrelatedRandomVectorGenerator(nbDimensions, scalarGenerator);
 
