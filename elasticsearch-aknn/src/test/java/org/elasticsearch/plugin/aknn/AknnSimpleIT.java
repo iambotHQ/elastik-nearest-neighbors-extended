@@ -17,7 +17,6 @@
 
 package org.elasticsearch.plugin.aknn;
 
-import org.apache.commons.math3.random.*;
 import org.apache.commons.math3.util.Pair;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.client.Request;
@@ -203,8 +202,6 @@ public class AknnSimpleIT extends ESIntegTestCase {
         final int k1 = 500;
         aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
-        RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
-        rg.setSeed(55626L);
         for(int j = 0; j < numBatches; j++) {
             List<CreateIndexRequest.Doc> docs = new ArrayList<>();
             for (int i = 0; i < batchSize; i++) {
