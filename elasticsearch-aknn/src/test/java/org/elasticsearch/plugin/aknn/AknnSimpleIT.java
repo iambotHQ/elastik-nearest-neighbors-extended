@@ -76,7 +76,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
             aknnAPI.createModel(RequestFactory.createModelRequest(201, 1));
             fail("CreateModelRequest with the same ID as previous should result in an exception");
         } catch(ResponseException e) {
-            assertEquals(409, e.getResponse().getStatusLine().getStatusCode());
+            assertEquals(400, e.getResponse().getStatusLine().getStatusCode());
         }
     }
 
