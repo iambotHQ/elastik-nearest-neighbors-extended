@@ -80,7 +80,7 @@ public class AknnRestAction extends BaseRestHandler {
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
-    private Map<String, LshModel> lshModelCache = new HashMap<>();
+    private Map<String, LshModel> lshModelCache = new ConcurrentHashMap<>();
     private ExecutorService executorService;
 
     @Inject
@@ -482,6 +482,14 @@ public class AknnRestAction extends BaseRestHandler {
         logger.debug("Serialize LSH model");
         stopWatch.start("Serialize LSH model");
         Map<String, Object> lshSerialized = lshModel.toMap();
+        stopWatch.stop();
+
+        logger.debug("Create LSH index");
+        stopWatch.start("Create LSH index");
+        client.admin().indices()
+                .prepareCreate(_index)
+                .addMapping(_type, "_aknn_bases", "index=false,type=double", "_aknn_bases_seed", "index=false,type=long")
+                .get();
         stopWatch.stop();
 
         logger.debug("Index LSH model");
