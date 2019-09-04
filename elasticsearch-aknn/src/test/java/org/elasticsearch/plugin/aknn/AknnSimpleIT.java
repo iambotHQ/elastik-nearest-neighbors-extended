@@ -195,12 +195,15 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * @throws IOException if performing a request fails
      */
     public void testLSHSimilar() throws IOException {
-        final int batchSize = 1000;
-        final int numBatches = 10;
-        final int nbDimensions = 50;
+        final int batchSize = 100;
+        final int numBatches = 100;
+        final int nbDimensions = 2048;
         final int takeN = 10;
         final int k1 = 500;
         aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
+        admin().indices().prepareCreate(RequestFactory.index)
+                .addMapping(RequestFactory.indexType, "_aknn_vector", "index=false,type=double")
+                .get();
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
         for(int j = 0; j < numBatches; j++) {
             List<CreateIndexRequest.Doc> docs = new ArrayList<>();
