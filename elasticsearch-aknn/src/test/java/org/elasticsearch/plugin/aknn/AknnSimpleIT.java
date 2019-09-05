@@ -34,6 +34,9 @@ import org.junit.Before;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -194,31 +197,35 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * Test that similarity search returns similar results
      * @throws IOException if performing a request fails
      */
-    public void testLSHSimilar() throws IOException {
-        final int batchSize = 100;
-        final int numBatches = 100;
-        final int nbDimensions = 2048;
+    public void testLSHSimilar() throws IOException, InterruptedException {
+        final int numDocs = 1000;
+        final int nbDimensions = 50;
         final int takeN = 10;
         final int k1 = 500;
         aknnAPI.createModel(RequestFactory.createModelRequest(100, 8));
         admin().indices().prepareCreate(RequestFactory.index)
                 .addMapping(RequestFactory.indexType, "_aknn_vector", "index=false,type=double")
                 .get();
+        ExecutorService workerPool = Executors.newFixedThreadPool(16);
         List<CreateIndexRequest.Doc> documents = new ArrayList<>();
-        for(int j = 0; j < numBatches; j++) {
-            List<CreateIndexRequest.Doc> docs = new ArrayList<>();
-            for (int i = 0; i < batchSize; i++) {
-                double[] vector = IntStream.generate(() -> 1).mapToDouble(v -> v).limit(nbDimensions).toArray();
-                vector[0] = 0.00001 * (j * batchSize + i);
-                if (j * batchSize + i > takeN) {
-                    vector = Arrays.stream(vector).map(v -> -v).toArray();
-                }
-                CreateIndexRequest.Source source = new CreateIndexRequest.Source(vector);
-                docs.add(new CreateIndexRequest.Doc(String.valueOf(j * batchSize + i), source));
+        for(int i = 0; i < numDocs; i++) {
+            double[] vector = IntStream.generate(() -> 1).mapToDouble(v -> v).limit(nbDimensions).toArray();
+            vector[0] = 0.00001 * i;
+            if (i > takeN) {
+                vector = Arrays.stream(vector).map(v -> -v).toArray();
             }
-            aknnAPI.createIndex(RequestFactory.createIndexRequest(docs));
-            documents.addAll(docs);
+            CreateIndexRequest.Source source = new CreateIndexRequest.Source(vector);
+            CreateIndexRequest.Doc doc = new CreateIndexRequest.Doc(String.valueOf(i), source);
+            documents.add(doc);
+            final int ij = i;
+            workerPool.submit(() -> {
+                System.out.println(ij);
+                aknnAPI.createIndex(RequestFactory.createIndexRequest(Collections.singletonList(doc)));
+                return null;
+            });
         }
+        workerPool.shutdown();
+        workerPool.awaitTermination(24L, TimeUnit.HOURS);
         refresh();
 
         double[] searchVec = IntStream.generate(() -> 1).mapToDouble(v -> v).limit(nbDimensions).toArray();

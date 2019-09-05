@@ -129,8 +129,10 @@ public class AknnRestAction extends BaseRestHandler {
         try {
             return task.getResult();
         } catch(ElasticsearchException e) {
+            logger.error(e);
             throw e;
         } catch(Exception e) {
+            logger.error(e);
             throw new AknnException(e);
         }
     }
