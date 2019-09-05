@@ -46,11 +46,7 @@ import org.elasticsearch.search.SearchHit;
 import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
@@ -412,12 +408,16 @@ public class AknnRestAction extends BaseRestHandler {
         LshModel lshModel = initLsh(aknnURI, client);
 
         stopWatch.start("Query nearest neighbors");
-        @SuppressWarnings("unchecked")
-        Map<String, Long> queryHashes = lshModel.getVectorHashes(queryVector);
-        //logger.debug("HASHES: {}", queryHashes);
+        List<Map<String, Object>> modifiedSortedHits;
+        if(!lshModel.hasBases()) {
+            modifiedSortedHits = new ArrayList<>();
+        } else {
+            @SuppressWarnings("unchecked")
+            Map<String, Long> queryHashes = lshModel.getVectorHashes(queryVector);
+            //logger.debug("HASHES: {}", queryHashes);
+            modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
+        }
 
-
-        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
         stopWatch.stop();
         logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
         return channel -> {
@@ -468,10 +468,8 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.start("Fit LSH model with base vectors");
         LshModel lshModel;
         if (randomBase) {
-            lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description);
-            if(nbDimensions != null) {
-                lshModel.generateBases(nbDimensions);
-            }
+            Random rng = new Random();
+            lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description, rng.nextLong());
         }
         else {
             @SuppressWarnings("unchecked") final List<List<Double>> vectorSample = (List<List<Double>>) contentMap.get("_aknn_vector_sample");
@@ -550,7 +548,6 @@ public class AknnRestAction extends BaseRestHandler {
             Map<String, Object> doc = docs.get(0);
             @SuppressWarnings("unchecked")
             Map<String, Object> source = (Map<String, Object>) doc.get("_source");
-            @SuppressWarnings("unchecked")
             List<Double> vector = parseVectorFrom(source);
             lshModel.generateBases(vector.size());
             Map<String, Object> lshSerialized = lshModel.toMap();

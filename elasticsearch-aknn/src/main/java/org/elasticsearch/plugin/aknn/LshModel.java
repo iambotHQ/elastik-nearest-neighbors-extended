@@ -32,7 +32,7 @@ public class LshModel {
     private Integer nbDimensions;
     private String description;
 
-    private List<RealMatrix> bases;
+    private List<RealMatrix> bases = null;
     private Long basesSeed = null;
 
 
@@ -51,21 +51,12 @@ public class LshModel {
                 .collect(Collectors.toList());
     }
 
-    public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description) {
-        this(nbTables, nbBitsPerTable, nbDimensions, description, (Long) null);
-    }
-
     public LshModel(Integer nbTables, Integer nbBitsPerTable, Integer nbDimensions, String description, Long basesSeed) {
         this.nbTables = nbTables;
         this.nbBitsPerTable = nbBitsPerTable;
         this.nbDimensions = nbDimensions;
         this.description = description;
-        if(basesSeed == null) {
-            Random r = new Random();
-            this.basesSeed = r.nextLong();
-        } else {
-            this.basesSeed = basesSeed;
-        }
+        this.basesSeed = basesSeed;
     }
 
     public Map<String, Long> getVectorHashes(List<Double> queryVector) {
