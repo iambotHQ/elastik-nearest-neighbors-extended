@@ -16,6 +16,7 @@
  */
 package org.elasticsearch.plugin.aknn;
 
+import com.google.common.primitives.Doubles;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.random.*;
@@ -117,6 +118,15 @@ public class LshModel {
 
     public boolean hasBases() {
         return this.bases != null;
+    }
+
+    public int estimateBytesUsage() {
+        if(hasBases() && bases.size() > 0) {
+            RealMatrix base = bases.get(0);
+            return bases.size() * base.getColumnDimension() * base.getRowDimension() * Doubles.BYTES;
+        } else {
+            return 0;
+        }
     }
 
     private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {

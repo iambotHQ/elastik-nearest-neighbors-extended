@@ -16,6 +16,9 @@
  */
 package org.elasticsearch.plugin.aknn;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.Weigher;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.elasticsearch.ElasticsearchException;
@@ -76,7 +79,7 @@ public class AknnRestAction extends BaseRestHandler {
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
-    private Map<String, LshModel> lshModelCache = new ConcurrentHashMap<>();
+    private Cache<String, LshModel> lshModelCache;
     private ExecutorService executorService;
 
     @Inject
@@ -98,6 +101,10 @@ public class AknnRestAction extends BaseRestHandler {
                     TimeUnit.MILLISECONDS,
                     new LinkedBlockingQueue<>()
             );
+            lshModelCache = CacheBuilder.newBuilder()
+                    .maximumWeight(cfg.getLong("lsh-cache.maxSizeMb") * 1000000L)
+                    .weigher((Weigher<String, LshModel>) (key, value) -> value.estimateBytesUsage())
+                    .build();
             return null;
         });
     }
@@ -152,11 +159,9 @@ public class AknnRestAction extends BaseRestHandler {
 
 	// Loading LSH model refactored as function
     //TODO Fix issues with stopwatch 
-    public LshModel initLsh(String aknnURI, NodeClient client) {
-        LshModel lshModel;
+    public LshModel initLsh(String aknnURI, NodeClient client) throws ExecutionException {
         StopWatch stopWatch = new StopWatch("StopWatch to load LSH cache");
-        if (!lshModelCache.containsKey(aknnURI)) {
-
+        LshModel model = lshModelCache.get(aknnURI, () -> {
             // Get the Aknn document.
             logger.debug("Get Aknn model document from {}", aknnURI);
             stopWatch.start("Get Aknn model document");
@@ -167,19 +172,11 @@ public class AknnRestAction extends BaseRestHandler {
             // Instantiate LSH from the source map.
             logger.debug("Parse Aknn model document");
             stopWatch.start("Parse Aknn model document");
-            lshModel = LshModel.fromMap(aknnGetResponse.getSourceAsMap());
-            stopWatch.stop();
-
-            // Save for later.
-            lshModelCache.put(aknnURI, lshModel);
-
-        } else {
-            logger.debug("Get Aknn model document from local cache");
-            stopWatch.start("Get Aknn model document from local cache");
-            lshModel = lshModelCache.get(aknnURI);
-            stopWatch.stop();
-        }
-        return lshModel;
+            LshModel lshModel = LshModel.fromMap(aknnGetResponse.getSourceAsMap());
+            return lshModel;
+        });
+        stopWatch.stop();
+        return model;
     }
 
 	//  Query execution refactored as function and added wrapper query
@@ -343,7 +340,7 @@ public class AknnRestAction extends BaseRestHandler {
         };
     }
 
-    private RestChannelConsumer handleSearchVecRequest(RestRequest restRequest, NodeClient client) throws IOException {
+    private RestChannelConsumer handleSearchVecRequest(RestRequest restRequest, NodeClient client) throws Exception {
 		
 		 /**
          * Hybrid of refactored handleSearchRequest() and handleIndexRequest()
@@ -361,7 +358,6 @@ public class AknnRestAction extends BaseRestHandler {
          * @param  rescore      If set to 'True' will return results without exact matching stage
          * @param  debug        If set to 'True' will include original vectors and hashes in hits
          * @param  order        One of 'asc' or 'desc' (default)
-		 * @param  clear_cache  Force update LSH model cache before executing hashing.
          * @return          Return search hits
          */
 		
@@ -395,17 +391,11 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer k2 = (Integer) aknnQueryMap.get("k2");
         final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
-        final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
         final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
 
         List<Double> queryVector = parseVectorFrom(aknnQueryMap);
         stopWatch.stop();
-        // Clear LSH model cache if requested
-        if (clearCache) {
-            // Clear LSH model cache
-            lshModelCache.remove(aknnURI);
-        }
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
         LshModel lshModel = initLsh(aknnURI, client);
 
@@ -511,7 +501,7 @@ public class AknnRestAction extends BaseRestHandler {
         };
     }
 
-    private RestChannelConsumer handleIndexRequest(RestRequest restRequest, NodeClient client) throws IOException {
+    private RestChannelConsumer handleIndexRequest(RestRequest restRequest, NodeClient client) throws Exception {
 
         StopWatch stopWatch = new StopWatch("StopWatch to time bulk indexing request");
 
@@ -527,19 +517,12 @@ public class AknnRestAction extends BaseRestHandler {
         final String type = (String) contentMap.get("_type");
         final String aknnURI = (String) contentMap.get("_aknn_uri");
         final int retryOnConflict = restRequest.paramAsInt("retryOnConflict", 5);
-        final Boolean clearCache = restRequest.paramAsBoolean("clear_cache", false);
         @SuppressWarnings("unchecked") final List<Map<String, Object>> docs = (List<Map<String, Object>>) contentMap.get("_aknn_docs");
         logger.debug("Received {} docs for indexing", docs.size());
         stopWatch.stop();
 
         // TODO: check if the index exists. If not, create a mapping which does not index continuous values.
         // This is rather low priority, as I tried it via Python and it doesn't make much difference.
-
-        // Clear LSH model cache if requested
-        if (clearCache) {
-            // Clear LSH model cache
-            lshModelCache.remove(aknnURI);
-        }
 
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
         LshModel lshModel = initLsh(aknnURI, client);
@@ -607,17 +590,13 @@ public class AknnRestAction extends BaseRestHandler {
         };
     }
 
-    private RestChannelConsumer handleClearRequest(RestRequest restRequest, NodeClient client) throws IOException {
-
-        //TODO: figure out how to execute clear cache on all nodes at once;
-
+    private RestChannelConsumer handleClearRequest(RestRequest restRequest, NodeClient client) {
         StopWatch stopWatch = new StopWatch("StopWatch to time clear cache");
         logger.debug("Clearing LSH models cache");
         stopWatch.start("Clearing cache");
-        lshModelCache.clear();
+        lshModelCache.invalidateAll();
         stopWatch.stop();
         logger.debug("Timing summary\n {}", stopWatch.prettyPrint());
-
 
         return channel -> {
             XContentBuilder builder = channel.newBuilder();
