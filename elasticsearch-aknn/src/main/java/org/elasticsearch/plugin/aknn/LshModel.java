@@ -16,7 +16,6 @@
  */
 package org.elasticsearch.plugin.aknn;
 
-import com.google.common.primitives.Doubles;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.random.*;
@@ -123,7 +122,7 @@ public class LshModel {
     public int estimateBytesUsage() {
         if(hasBases() && bases.size() > 0) {
             RealMatrix base = bases.get(0);
-            return bases.size() * base.getColumnDimension() * base.getRowDimension() * Doubles.BYTES;
+            return bases.size() * base.getColumnDimension() * base.getRowDimension() * 8;
         } else {
             return 0;
         }

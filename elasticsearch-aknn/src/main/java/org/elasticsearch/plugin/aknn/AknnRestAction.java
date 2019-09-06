@@ -16,9 +16,6 @@
  */
 package org.elasticsearch.plugin.aknn;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.Weigher;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.elasticsearch.ElasticsearchException;
@@ -28,6 +25,7 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.StopWatch;
+import org.elasticsearch.common.cache.*;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -79,7 +77,7 @@ public class AknnRestAction extends BaseRestHandler {
     private final Integer MINIMUM_DEFAULT = 1;
 	
 	// TODO: add an option to the index endpoint handler that empties the cache.
-    private Cache<String, LshModel> lshModelCache;
+    private Cache<Object, Object> lshModelCache;
     private ExecutorService executorService;
 
     @Inject
@@ -101,9 +99,9 @@ public class AknnRestAction extends BaseRestHandler {
                     TimeUnit.MILLISECONDS,
                     new LinkedBlockingQueue<>()
             );
-            lshModelCache = CacheBuilder.newBuilder()
-                    .maximumWeight(cfg.getLong("lsh-cache.maxSizeMb") * 1000000L)
-                    .weigher((Weigher<String, LshModel>) (key, value) -> value.estimateBytesUsage())
+            lshModelCache = CacheBuilder.builder()
+                    .setMaximumWeight(cfg.getLong("lsh-cache.maxSizeMb") * 1000000L)
+                    .weigher((s, lshModel) -> ((LshModel) lshModel).estimateBytesUsage())
                     .build();
             return null;
         });
@@ -161,7 +159,7 @@ public class AknnRestAction extends BaseRestHandler {
     //TODO Fix issues with stopwatch 
     public LshModel initLsh(String aknnURI, NodeClient client) throws ExecutionException {
         StopWatch stopWatch = new StopWatch("StopWatch to load LSH cache");
-        LshModel model = lshModelCache.get(aknnURI, () -> {
+        LshModel model = (LshModel) lshModelCache.computeIfAbsent(aknnURI, key -> {
             // Get the Aknn document.
             logger.debug("Get Aknn model document from {}", aknnURI);
             stopWatch.start("Get Aknn model document");
