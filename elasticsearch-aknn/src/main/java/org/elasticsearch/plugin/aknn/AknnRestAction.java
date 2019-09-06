@@ -171,9 +171,9 @@ public class AknnRestAction extends BaseRestHandler {
             logger.debug("Parse Aknn model document");
             stopWatch.start("Parse Aknn model document");
             LshModel lshModel = LshModel.fromMap(aknnGetResponse.getSourceAsMap());
+            stopWatch.stop();
             return lshModel;
         });
-        stopWatch.stop();
         return model;
     }
 
