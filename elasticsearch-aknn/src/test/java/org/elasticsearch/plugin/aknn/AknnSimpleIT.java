@@ -30,6 +30,7 @@ import org.elasticsearch.plugin.aknn.models.GetVectorResponse;
 import org.elasticsearch.plugin.aknn.utils.AknnAPI;
 import org.elasticsearch.plugin.aknn.utils.RequestFactory;
 import org.elasticsearch.test.ESIntegTestCase;
+import org.junit.After;
 import org.junit.Before;
 
 import java.io.IOException;
