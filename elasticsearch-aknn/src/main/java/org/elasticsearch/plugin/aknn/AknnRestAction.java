@@ -480,7 +480,9 @@ public class AknnRestAction extends BaseRestHandler {
                     .prepareCreate(_index)
                     .addMapping(_type, "_aknn_bases", "index=false,type=double", "_aknn_bases_seed", "index=false,type=long")
                     .get();
-        } catch(ResourceAlreadyExistsException ignored) { }
+        } catch(ResourceAlreadyExistsException ignored) {
+            logger.warn("Index " + _index + " already exists, skipping adding mapping");
+        }
         stopWatch.stop();
 
         logger.debug("Index LSH model");
