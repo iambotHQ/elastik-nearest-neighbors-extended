@@ -119,6 +119,15 @@ public class LshModel {
         return this.bases != null;
     }
 
+    public int estimateBytesUsage() {
+        if(hasBases() && bases.size() > 0) {
+            RealMatrix base = bases.get(0);
+            return bases.size() * base.getColumnDimension() * base.getRowDimension() * 8;
+        } else {
+            return 0;
+        }
+    }
+
     private List<RealMatrix> getRandomNormalVectors(int nbTables, int nbBitsPerTable, int nbDimensions) {
         RandomGenerator rg = new RandomDataGenerator().getRandomGenerator();
         rg.setSeed(this.basesSeed);

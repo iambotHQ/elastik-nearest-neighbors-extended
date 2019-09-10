@@ -72,7 +72,7 @@ public class AknnSimpleIT extends ESIntegTestCase {
      * Test that a model cannot be updated
      * @throws IOException if performing a request fails
      */
-    public void testModelCreate() throws IOException {
+    public void testModelImmutable() throws IOException {
         aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
         refresh();
         try {

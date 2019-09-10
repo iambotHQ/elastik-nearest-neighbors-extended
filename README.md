@@ -13,7 +13,7 @@ _SthPhoenix's readme_
 
      Usage example:
      ```
-     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=COSINE&debug=false&minimum_should_match=1&clear_cache=false&order=desc
+     POST <elasticsearch host>:9200/_aknn_search_vec?rescore=COSINE&debug=false&minimum_should_match=1&order=desc
      {
          "_index":       "twitter_images",
          "_type":        "_doc",

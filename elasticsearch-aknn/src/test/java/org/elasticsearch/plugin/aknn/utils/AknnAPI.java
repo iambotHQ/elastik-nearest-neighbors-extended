@@ -36,7 +36,8 @@ public class AknnAPI {
     }
 
     public void createIndex(CreateIndexRequest request) throws IOException {
-        performJSONRequest(gson.toJson(request), "_aknn_index?clear_cache=true");
+        restClient.performRequest(new Request("GET", "_aknn_clear_cache"));
+        performJSONRequest(gson.toJson(request), "_aknn_index");
     }
 
     public SimilaritySearchResponse similaritySearch(SimilaritySearchRequest request, boolean orderDesc) throws IOException {
