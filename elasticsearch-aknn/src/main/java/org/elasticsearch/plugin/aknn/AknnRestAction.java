@@ -19,6 +19,7 @@ package org.elasticsearch.plugin.aknn;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.ResourceAlreadyExistsException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
@@ -474,10 +475,12 @@ public class AknnRestAction extends BaseRestHandler {
 
         logger.debug("Create LSH index");
         stopWatch.start("Create LSH index");
-        client.admin().indices()
-                .prepareCreate(_index)
-                .addMapping(_type, "_aknn_bases", "index=false,type=double", "_aknn_bases_seed", "index=false,type=long")
-                .get();
+        try {
+            client.admin().indices()
+                    .prepareCreate(_index)
+                    .addMapping(_type, "_aknn_bases", "index=false,type=double", "_aknn_bases_seed", "index=false,type=long")
+                    .get();
+        } catch(ResourceAlreadyExistsException ignored) { }
         stopWatch.stop();
 
         logger.debug("Index LSH model");
