@@ -18,10 +18,16 @@ package org.elasticsearch.plugin.aknn;
 
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.random.*;
+import org.apache.commons.math3.random.RandomGenerator;
+import org.apache.commons.math3.random.RandomDataGenerator;
+import org.apache.commons.math3.random.GaussianRandomGenerator;
+import org.apache.commons.math3.random.UncorrelatedRandomVectorGenerator;
 import org.apache.commons.math3.util.Pair;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 

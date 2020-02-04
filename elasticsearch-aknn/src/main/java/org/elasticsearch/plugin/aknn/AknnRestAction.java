@@ -18,6 +18,7 @@ package org.elasticsearch.plugin.aknn;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import org.apache.logging.log4j.Level;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ResourceAlreadyExistsException;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -25,8 +26,10 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.node.NodeClient;
+import org.elasticsearch.common.Randomness;
 import org.elasticsearch.common.StopWatch;
-import org.elasticsearch.common.cache.*;
+import org.elasticsearch.common.cache.Cache;
+import org.elasticsearch.common.cache.CacheBuilder;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -48,8 +51,18 @@ import org.elasticsearch.search.SearchHit;
 import java.io.IOException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Comparator;
+import java.util.Random;
+import java.util.Locale;
+import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
@@ -76,8 +89,8 @@ public class AknnRestAction extends BaseRestHandler {
     private final Integer K2_DEFAULT = 10;
     private final String RESCORE_DEFAULT = RESCORE_COSINE;
     private final Integer MINIMUM_DEFAULT = 1;
-	
-	// TODO: add an option to the index endpoint handler that empties the cache.
+
+    // TODO: add an option to the index endpoint handler that empties the cache.
     private Cache<Object, Object> lshModelCache;
     private ExecutorService executorService;
 
@@ -134,11 +147,11 @@ public class AknnRestAction extends BaseRestHandler {
         executorService.submit(task);
         try {
             return task.getResult();
-        } catch(ElasticsearchException e) {
-            logger.error(e);
+        } catch (ElasticsearchException e) {
+            logger.log(Level.ERROR, "Unexpected Elasticsearch exception", e);
             throw e;
-        } catch(Exception e) {
-            logger.error(e);
+        } catch (Exception e) {
+            logger.log(Level.ERROR, "Unexpected exception", e);
             throw new AknnException(e);
         }
     }
@@ -156,7 +169,7 @@ public class AknnRestAction extends BaseRestHandler {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-	// Loading LSH model refactored as function
+    // Loading LSH model refactored as function
     //TODO Fix issues with stopwatch 
     public LshModel initLsh(String aknnURI, NodeClient client) throws ExecutionException {
         StopWatch stopWatch = new StopWatch("StopWatch to load LSH cache");
@@ -178,7 +191,7 @@ public class AknnRestAction extends BaseRestHandler {
         return model;
     }
 
-	//  Query execution refactored as function and added wrapper query
+    //  Query execution refactored as function and added wrapper query
     private List<Map<String, Object>> queryLsh(List<Double> queryVector, Map<String, Long> queryHashes, String index,
                                                String type, Integer k1, String rescore, String filterString, Integer minimumShouldMatch,
                                                Boolean debug, NodeClient client, Boolean orderDesc) {
@@ -201,9 +214,8 @@ public class AknnRestAction extends BaseRestHandler {
 
         String hashes;
         if (!debug) {
-           hashes = HASHES_KEY;
-        }
-        else {
+            hashes = HASHES_KEY;
+        } else {
             hashes = null;
         }
 
@@ -233,7 +245,7 @@ public class AknnRestAction extends BaseRestHandler {
             }
 
             Double computedScore;
-            if(rescore.equals(RESCORE_COSINE)) {
+            if (rescore.equals(RESCORE_COSINE)) {
                 computedScore = cosineSimilarity(queryVector, hitVector);
             } else {
                 computedScore = (double) hit.getScore();
@@ -264,7 +276,7 @@ public class AknnRestAction extends BaseRestHandler {
 
 
     private RestChannelConsumer handleSearchRequest(RestRequest restRequest, NodeClient client) throws IOException {
-		/**
+        /**
          * Original handleSearchRequest() refactored for further reusability
          * and added some additional parameters, such as filter query.
          *
@@ -279,7 +291,7 @@ public class AknnRestAction extends BaseRestHandler {
          * @param  rescore  If set to 'True' will return results without exact matching stage
          * @param  debug    If set to 'True' will include original vectors and hashes in hits
          * @param  order    One of 'asc' or 'desc' (default)
-         * @return          Return search hits
+         * @return Return search hits
          */
 
         StopWatch stopWatch = new StopWatch("StopWatch to Time Search Request");
@@ -295,7 +307,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
-        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
+        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase(Locale.ENGLISH).equals("DESC");
         stopWatch.stop();
 
         logger.debug("Get query document at {}/{}/{}", index, type, id);
@@ -315,7 +327,8 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.stop();
 
         stopWatch.start("Query nearest neighbors");
-        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
+        List<Map<String, Object>> modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1,
+                rescore, filter, minimumShouldMatch, debug, client, orderDesc);
 
         stopWatch.stop();
 
@@ -340,10 +353,10 @@ public class AknnRestAction extends BaseRestHandler {
     }
 
     private RestChannelConsumer handleSearchVecRequest(RestRequest restRequest, NodeClient client) throws Exception {
-		
-		 /**
+
+        /**
          * Hybrid of refactored handleSearchRequest() and handleIndexRequest()
-		 * Takes document containing query vector, hashes it, and executing query 
+         * Takes document containing query vector, hashes it, and executing query
          * without indexing.
          *
          * @param  index        Index name
@@ -357,9 +370,9 @@ public class AknnRestAction extends BaseRestHandler {
          * @param  rescore      If set to 'True' will return results without exact matching stage
          * @param  debug        If set to 'True' will include original vectors and hashes in hits
          * @param  order        One of 'asc' or 'desc' (default)
-         * @return          Return search hits
+         * @return Return search hits
          */
-		
+
 
         StopWatch stopWatch = new StopWatch("StopWatch to Time Search Request");
 
@@ -391,7 +404,7 @@ public class AknnRestAction extends BaseRestHandler {
         final Integer minimumShouldMatch = restRequest.paramAsInt("minimum_should_match", MINIMUM_DEFAULT);
         final String rescore = restRequest.param("rescore", RESCORE_DEFAULT);
         final Boolean debug = restRequest.paramAsBoolean("debug", false);
-        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase().equals("DESC");
+        final Boolean orderDesc = restRequest.param("order", "desc").toUpperCase(Locale.ENGLISH).equals("DESC");
 
         List<Double> queryVector = parseVectorFrom(aknnQueryMap);
         stopWatch.stop();
@@ -400,13 +413,14 @@ public class AknnRestAction extends BaseRestHandler {
 
         stopWatch.start("Query nearest neighbors");
         List<Map<String, Object>> modifiedSortedHits;
-        if(!lshModel.hasBases()) {
+        if (!lshModel.hasBases()) {
             modifiedSortedHits = new ArrayList<>();
         } else {
             @SuppressWarnings("unchecked")
             Map<String, Long> queryHashes = lshModel.getVectorHashes(queryVector);
             //logger.debug("HASHES: {}", queryHashes);
-            modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore, filter, minimumShouldMatch, debug, client, orderDesc);
+            modifiedSortedHits = queryLsh(queryVector, queryHashes, index, type, k1, rescore,
+                    filter, minimumShouldMatch, debug, client, orderDesc);
         }
 
         stopWatch.stop();
@@ -464,7 +478,7 @@ public class AknnRestAction extends BaseRestHandler {
                     .prepareCreate(_index)
                     .addMapping(_type, "_aknn_bases", "index=false,type=double", "_aknn_bases_seed", "index=false,type=long")
                     .get();
-        } catch(ResourceAlreadyExistsException ignored) {
+        } catch (ResourceAlreadyExistsException ignored) {
             logger.warn("Index " + _index + " already exists, skipping adding mapping");
             stopWatch.stop();
             return channel -> {
@@ -481,11 +495,11 @@ public class AknnRestAction extends BaseRestHandler {
         stopWatch.start("Fit LSH model with base vectors");
         LshModel lshModel;
         if (randomBase) {
-            Random rng = new Random();
+            Random rng = Randomness.get();
             lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description, rng.nextLong());
-        }
-        else {
-            @SuppressWarnings("unchecked") final List<List<Double>> vectorSample = (List<List<Double>>) contentMap.get("_aknn_vector_sample");
+        } else {
+            @SuppressWarnings("unchecked") final List<List<Double>> vectorSample =
+                    (List<List<Double>>) contentMap.get("_aknn_vector_sample");
             lshModel = new LshModel(nbTables, nbBitsPerTable, nbDimensions, description, vectorSample);
         }
         stopWatch.stop();
@@ -541,7 +555,7 @@ public class AknnRestAction extends BaseRestHandler {
         // Check if the LshModel has been cached. If not, retrieve the Aknn document and use it to populate the model.
         LshModel lshModel = initLsh(aknnURI, client);
         // lazily generate bases if needed
-        if(!lshModel.hasBases() && docs.size() > 0) {
+        if (!lshModel.hasBases() && docs.size() > 0) {
             logger.debug("Lazily generate bases");
             stopWatch.start("Lazily generate bases");
             Map<String, Object> doc = docs.get(0);

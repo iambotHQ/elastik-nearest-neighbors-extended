@@ -12,7 +12,7 @@ buildscript {
 }
 
 group = 'org.elasticsearch.plugin.aknn'
-version = '0.0.6'
+version = '0.0.7'
 
 apply plugin: 'java'
 apply plugin: 'elasticsearch.esplugin'
@@ -71,7 +71,7 @@ integTestRunner {
 
 // Set to false to not use elasticsearch checkstyle rules.
 checkstyleMain.enabled = true
-checkstyleTest.enabled = true
+checkstyleTest.enabled = false
 
 // FIXME dependency license check needs to be enabled
 dependencyLicenses.enabled = false

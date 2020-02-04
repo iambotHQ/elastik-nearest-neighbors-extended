@@ -67,20 +67,23 @@ public class AknnSimpleIT extends ESIntegTestCase {
         String body = EntityUtils.toString(response.getEntity());
         assertTrue(body.contains("elasticsearch-aknn"));
     }
+    /**
+     * Test that a model create returns 201 for create
+     */
+    public void testModelCreate() throws IOException {
+        Response response = aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
+        assertEquals(201, response.getStatusLine().getStatusCode());
+    }
 
     /**
-     * Test that a model cannot be updated
+     * Test that a model if already exsists, return 200
      * @throws IOException if performing a request fails
      */
     public void testModelImmutable() throws IOException {
         aknnAPI.createModel(RequestFactory.createModelRequest(200, 1));
         refresh();
-        try {
-            aknnAPI.createModel(RequestFactory.createModelRequest(201, 1));
-            fail("CreateModelRequest with the same ID as previous should result in an exception");
-        } catch(ResponseException e) {
-            assertEquals(400, e.getResponse().getStatusLine().getStatusCode());
-        }
+        Response response = aknnAPI.createModel(RequestFactory.createModelRequest(201, 1));
+        assertEquals(200, response.getStatusLine().getStatusCode());
     }
 
     /**
@@ -219,7 +222,6 @@ public class AknnSimpleIT extends ESIntegTestCase {
             documents.add(doc);
             final int ij = i;
             workerPool.submit(() -> {
-                System.out.println(ij);
                 aknnAPI.createIndex(RequestFactory.createIndexRequest(Collections.singletonList(doc)));
                 return null;
             });
