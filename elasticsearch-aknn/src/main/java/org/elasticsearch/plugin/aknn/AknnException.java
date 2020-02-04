@@ -16,6 +16,11 @@
 package org.elasticsearch.plugin.aknn;
 
 public class AknnException extends RuntimeException {
+
+    public AknnException(String message) {
+        super(message);
+    }
+
     public AknnException(Exception e) {
         super(e.getMessage(), e);
     }

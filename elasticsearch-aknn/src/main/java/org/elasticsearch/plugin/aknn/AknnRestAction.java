@@ -92,7 +92,8 @@ public class AknnRestAction extends BaseRestHandler {
 
     // TODO: add an option to the index endpoint handler that empties the cache.
     private Cache<Object, Object> lshModelCache;
-    private ExecutorService executorService;
+    private ExecutorService indexingExecutorService;
+    private ExecutorService queryingExecutorService;
 
     @Inject
     public AknnRestAction(Settings settings, RestController controller) {
@@ -106,19 +107,24 @@ public class AknnRestAction extends BaseRestHandler {
 
         AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
             Config cfg = ConfigFactory.load(AknnRestAction.class.getClassLoader());
-            executorService = new ThreadPoolExecutor(
-                    cfg.getInt("request-executor-service.corePoolSize"),
-                    cfg.getInt("request-executor-service.maximumPoolSize"),
-                    cfg.getLong("request-executor-service.keepAliveTimeMs"),
-                    TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>()
-            );
+            indexingExecutorService = createExecutorService(cfg, "index-executor-service");
+            queryingExecutorService = createExecutorService(cfg, "query-executor-service");
             lshModelCache = CacheBuilder.builder()
                     .setMaximumWeight(cfg.getLong("lsh-cache.maxSizeMb") * 1000000L)
                     .weigher((s, lshModel) -> ((LshModel) lshModel).estimateBytesUsage())
                     .build();
             return null;
         });
+    }
+
+    private ThreadPoolExecutor createExecutorService(Config cfg, String executor) {
+        return new ThreadPoolExecutor(
+                cfg.getInt(executor+".corePoolSize"),
+                cfg.getInt(executor+".maximumPoolSize"),
+                cfg.getLong(executor+".keepAliveTimeMs"),
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>()
+        );
     }
 
     // @Override
@@ -143,6 +149,19 @@ public class AknnRestAction extends BaseRestHandler {
             else
                 return handleCreateRequest(restRequest, client, true);
         });
+
+        ExecutorService executorService = null;
+
+            if (restRequest.path().endsWith(NAME_SEARCH_VEC))
+                executorService = queryingExecutorService;
+            else if (restRequest.path().endsWith(NAME_SEARCH))
+                executorService = queryingExecutorService;
+            else if (restRequest.path().endsWith(NAME_INDEX))
+                executorService = queryingExecutorService;
+            else if (restRequest.path().endsWith(NAME_CLEAR_CACHE))
+                executorService = queryingExecutorService;
+            else
+                executorService = indexingExecutorService;
 
         executorService.submit(task);
         try {
